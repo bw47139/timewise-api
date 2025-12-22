@@ -2,10 +2,15 @@
   "name": "timewise-api",
   "version": "1.0.0",
   "description": "TimeWise Clock Backend API",
+  "license": "UNLICENSED",
   "main": "dist/server.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "build:render": "tsc",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -18,6 +23,7 @@
     "@aws-sdk/s3-request-presigner": "^3.946.0",
     "@prisma/client": "^5.22.0",
     "@types/ws": "^8.18.1",
+    "aws-sdk": "^2.1693.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -33,11 +39,14 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@types/aws-sdk": "^0.0.42",
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/luxon": "^3.7.1",
+    "@types/nodemailer": "^7.0.4",
     "@types/pdfkit": "^0.17.4",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",

@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Location" ADD COLUMN     "biWeeklyAnchorDate" TIMESTAMP(3),
+ADD COLUMN     "monthlyCutDay" INTEGER DEFAULT 1,
+ADD COLUMN     "overtimeRule" TEXT NOT NULL DEFAULT 'DAILY',
+ADD COLUMN     "payPeriodType" TEXT NOT NULL DEFAULT 'WEEKLY',
+ADD COLUMN     "semiMonthCut1" INTEGER DEFAULT 1,
+ADD COLUMN     "semiMonthCut2" INTEGER DEFAULT 16,
+ADD COLUMN     "weekStartDay" INTEGER DEFAULT 1;

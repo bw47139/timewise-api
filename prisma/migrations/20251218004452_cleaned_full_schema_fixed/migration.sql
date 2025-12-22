@@ -1,0 +1,18 @@
+-- AlterTable
+ALTER TABLE "Employee" ADD COLUMN     "addressLine1" TEXT,
+ADD COLUMN     "addressLine2" TEXT,
+ADD COLUMN     "city" TEXT,
+ADD COLUMN     "country" TEXT DEFAULT 'USA',
+ADD COLUMN     "dateOfBirth" TIMESTAMP(3),
+ADD COLUMN     "department" TEXT,
+ADD COLUMN     "emergencyContactName" TEXT,
+ADD COLUMN     "emergencyContactPhone" TEXT,
+ADD COLUMN     "emergencyContactRelation" TEXT,
+ADD COLUMN     "gender" TEXT,
+ADD COLUMN     "hireDate" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "jobTitle" TEXT,
+ADD COLUMN     "phoneAlt" TEXT,
+ADD COLUMN     "phoneNumber" TEXT,
+ADD COLUMN     "postalCode" TEXT,
+ADD COLUMN     "ssnLast4" TEXT,
+ADD COLUMN     "state" TEXT;

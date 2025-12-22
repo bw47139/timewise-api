@@ -1,0 +1,17 @@
+-- AlterTable
+ALTER TABLE "Organization" ADD COLUMN     "accrualRatePerPeriod" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+ADD COLUMN     "address" TEXT,
+ADD COLUMN     "carryoverEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "carryoverLimit" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+ADD COLUMN     "city" TEXT,
+ADD COLUMN     "cutoffTime" TEXT DEFAULT '17:00',
+ADD COLUMN     "doubleTimeEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "logoUrl" TEXT,
+ADD COLUMN     "maxPtoBalance" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+ADD COLUMN     "overtimeDailyEnabled" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "overtimeWeeklyEnabled" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "phone" TEXT,
+ADD COLUMN     "ptoEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "state" TEXT,
+ADD COLUMN     "zipcode" TEXT,
+ALTER COLUMN "weekStartDay" SET DEFAULT 1;

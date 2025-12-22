@@ -3,6 +3,8 @@
     "target": "ES2020",
     "module": "CommonJS",
     "moduleResolution": "Node",
+
+    "rootDir": "src",
     "outDir": "./dist",
 
     // Needed for correct imports/exports
@@ -17,6 +19,9 @@
     // Avoid case-sensitivity issues on Windows
     "forceConsistentCasingInFileNames": true,
 
+    // ✅ CRITICAL: Enable Node.js globals (process, Buffer, path, http, etc.)
+    "types": ["node"],
+
     // 👇 Custom global type definitions (Express augmentation)
     "typeRoots": [
       "./node_modules/@types",
@@ -24,7 +29,7 @@
     ]
   },
 
-  // 👇 Scan ONLY source files (includes src/types automatically)
+  // 👇 Scan ONLY source files
   "include": [
     "src"
   ],

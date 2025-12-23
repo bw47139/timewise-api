@@ -1,51 +1,120 @@
+// src/modules/organization/organization.service.ts
+
 import { PrismaClient } from "@prisma/client";
-
-import { computePayPeriod } from "../payperiod/payPeriod.service";
-
-import { OrganizationUpdateData } from "./organization.types";
 
 const prisma = new PrismaClient();
 
 /* ---------------------------------------------
-   CREATE / READ / UPDATE / DELETE ORGANIZATION
+   TYPES — CREATE vs UPDATE (SCHEMA-TRUE)
 --------------------------------------------- */
 
-export function createOrganization(data: OrganizationUpdateData) {
-  return prisma.organization.create({ data });
+export type CreateOrganizationData = {
+  name: string; // REQUIRED
+  timezone?: string;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipcode?: string | null;
+};
+
+export type UpdateOrganizationData = Partial<CreateOrganizationData> & {
+  // Pay period CONFIG ONLY (stored fields only)
+  payPeriodType?: string;
+  weekStartDay?: number;
+  biweeklyAnchorDate?: Date | null;
+
+  // Locking
+  payPeriodLockEnabled?: boolean;
+  lockAfterDays?: number;
+
+  // Overtime / Doubletime
+  overtimeDailyThresholdHours?: number;
+  overtimeWeeklyThresholdHours?: number;
+  doubletimeDailyThresholdHours?: number;
+
+  // Auto-lunch
+  autoLunchEnabled?: boolean;
+  autoLunchMinutes?: number;
+  autoLunchMinimumShift?: number;
+  autoLunchDeductOnce?: boolean;
+  autoLunchIgnoreIfBreak?: boolean;
+
+  // PTO
+  ptoAccrualEnabled?: boolean;
+  ptoAccrualRateHoursPerHourWorked?: number;
+  ptoAccrualMaxBalanceHours?: number;
+  carryoverEnabled?: boolean;
+  carryoverLimit?: number;
+};
+
+/* ---------------------------------------------
+   INTERNAL HELPER
+--------------------------------------------- */
+
+function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const clean: Partial<T> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      (clean as any)[key] = value;
+    }
+  }
+  return clean;
+}
+
+/* ---------------------------------------------
+   CRUD — ORGANIZATION
+--------------------------------------------- */
+
+export function createOrganization(data: CreateOrganizationData) {
+  return prisma.organization.create({
+    data: {
+      name: data.name,
+      timezone: data.timezone ?? "America/New_York",
+      phone: data.phone ?? null,
+      address: data.address ?? null,
+      city: data.city ?? null,
+      state: data.state ?? null,
+      zipcode: data.zipcode ?? null,
+    },
+  });
 }
 
 export function getOrganization(id: number) {
-  return prisma.organization.findUnique({ where: { id } });
+  return prisma.organization.findUnique({
+    where: { id },
+  });
 }
 
-export function updateOrganization(id: number, data: OrganizationUpdateData) {
+export function updateOrganization(
+  id: number,
+  data: UpdateOrganizationData
+) {
   return prisma.organization.update({
     where: { id },
-    data,
+    data: stripUndefined(data),
   });
 }
 
 export function deleteOrganization(id: number) {
-  return prisma.organization.delete({ where: { id } });
+  return prisma.organization.delete({
+    where: { id },
+  });
 }
 
 /* ---------------------------------------------
-   NEW — LIST ALL ORGANIZATIONS
+   LISTING HELPERS
 --------------------------------------------- */
+
 export function getAllOrganizations() {
   return prisma.organization.findMany({
     orderBy: { id: "asc" },
   });
 }
 
-/* ---------------------------------------------
-   NEW — LIST ALL LOCATIONS (WITH ORG INFO)
---------------------------------------------- */
 export function getAllLocationsWithOrg() {
   return prisma.location.findMany({
-    include: {
-      organization: true,
-    },
+    include: { organization: true },
     orderBy: { id: "asc" },
   });
 }
@@ -69,27 +138,34 @@ export function getAutoLunchSettingsDB(id: number) {
   });
 }
 
-export function updateAutoLunchSettingsDB(id: number, data: any) {
+export function updateAutoLunchSettingsDB(
+  id: number,
+  data: Pick<
+    UpdateOrganizationData,
+    | "autoLunchEnabled"
+    | "autoLunchMinutes"
+    | "autoLunchMinimumShift"
+    | "autoLunchDeductOnce"
+    | "autoLunchIgnoreIfBreak"
+  >
+) {
   return prisma.organization.update({
     where: { id },
-    data,
+    data: stripUndefined(data),
   });
 }
 
 /* ---------------------------------------------
-   PAY PERIOD CALCULATION
+   PAY PERIOD CONFIG (READ-ONLY, SCHEMA SAFE)
 --------------------------------------------- */
 
-export async function getPayPeriod(id: number, refDate: Date) {
-  const org = await prisma.organization.findUnique({
+export function getPayPeriodConfig(id: number) {
+  return prisma.organization.findUnique({
     where: { id },
+    select: {
+      payPeriodType: true,
+      weekStartDay: true,
+      biweeklyAnchorDate: true,
+    },
   });
-
-  if (!org) return null;
-
-  const range = computePayPeriod(org, refDate);
-  return {
-    ...range,
-    payPeriodType: org.payPeriodType,
-  };
 }

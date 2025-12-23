@@ -1,8 +1,10 @@
 // src/modules/organization/pay-period.routes.ts
 
 import { Router, Request, Response } from "express";
+import { PayPeriodType } from "../../utils/payPeriodEngine";
 
 import { prisma } from "../../prisma";
+import { verifyToken } from "../../middleware/verifyToken";
 import {
   getPayPeriodRange,
   buildEffectiveSettingsFromOrgAndLocation,
@@ -11,24 +13,24 @@ import {
 const router = Router();
 
 /**
+ * =====================================================
  * GET /api/organization/pay-period
- * Return the organization's current pay-period configuration.
+ * -----------------------------------------------------
+ * Return the organization's current pay-period config
+ * =====================================================
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", verifyToken, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).user?.organizationId;
-    if (!orgId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const { organizationId } = req.user as any;
 
     const org = await prisma.organization.findUnique({
-      where: { id: orgId },
+      where: { id: organizationId },
       select: {
         id: true,
         timezone: true,
         payPeriodType: true,
         weekStartDay: true,
-        biWeeklyAnchorDate: true,
+        biweeklyAnchorDate: true, // ✅ FIXED
         cutoffTime: true,
         semiMonthCut1: true,
         semiMonthCut2: true,
@@ -41,8 +43,8 @@ router.get("/", async (req: Request, res: Response) => {
     }
 
     return res.json(org);
-  } catch (err) {
-    console.error("GET /api/organization/pay-period error:", err);
+  } catch (error) {
+    console.error("❌ GET /organization/pay-period:", error);
     return res
       .status(500)
       .json({ error: "Failed to load pay-period settings" });
@@ -50,33 +52,53 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 /**
+ * =====================================================
  * PATCH /api/organization/pay-period
- * Update organization-level pay-period configuration.
+ * -----------------------------------------------------
+ * Update organization-level pay-period configuration
+ * =====================================================
  */
-router.patch("/", async (req: Request, res: Response) => {
+router.patch("/", verifyToken, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).user?.organizationId;
-    if (!orgId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const { organizationId } = req.user as any;
 
     const {
       payPeriodType,
       weekStartDay,
-      biWeeklyAnchorDate,
+      biweeklyAnchorDate, // ✅ FIXED
       cutoffTime,
       semiMonthCut1,
       semiMonthCut2,
       monthlyCutDay,
     } = req.body;
 
+    // ---- Validate PayPeriodType ----
+    if (
+      payPeriodType !== undefined &&
+      !Object.values(PayPeriodType).includes(payPeriodType)
+    ) {
+      return res.status(400).json({
+        error: "Invalid payPeriodType",
+      });
+    }
+
+    // ---- Validate weekStartDay ----
+    if (
+      weekStartDay !== undefined &&
+      (weekStartDay < 0 || weekStartDay > 6)
+    ) {
+      return res.status(400).json({
+        error: "weekStartDay must be between 0 (Sunday) and 6 (Saturday)",
+      });
+    }
+
     const updated = await prisma.organization.update({
-      where: { id: orgId },
+      where: { id: organizationId },
       data: {
-        ...(payPeriodType && { payPeriodType }),
+        ...(payPeriodType !== undefined && { payPeriodType }),
         ...(weekStartDay !== undefined && { weekStartDay }),
-        ...(biWeeklyAnchorDate && { biWeeklyAnchorDate }),
-        ...(cutoffTime && { cutoffTime }),
+        ...(biweeklyAnchorDate !== undefined && { biweeklyAnchorDate }), // ✅ FIXED
+        ...(cutoffTime !== undefined && { cutoffTime }),
         ...(semiMonthCut1 !== undefined && { semiMonthCut1 }),
         ...(semiMonthCut2 !== undefined && { semiMonthCut2 }),
         ...(monthlyCutDay !== undefined && { monthlyCutDay }),
@@ -86,7 +108,7 @@ router.patch("/", async (req: Request, res: Response) => {
         timezone: true,
         payPeriodType: true,
         weekStartDay: true,
-        biWeeklyAnchorDate: true,
+        biweeklyAnchorDate: true, // ✅ FIXED
         cutoffTime: true,
         semiMonthCut1: true,
         semiMonthCut2: true,
@@ -95,8 +117,8 @@ router.patch("/", async (req: Request, res: Response) => {
     });
 
     return res.json(updated);
-  } catch (err) {
-    console.error("PATCH /api/organization/pay-period error:", err);
+  } catch (error) {
+    console.error("❌ PATCH /organization/pay-period:", error);
     return res
       .status(500)
       .json({ error: "Failed to update pay-period settings" });
@@ -104,69 +126,65 @@ router.patch("/", async (req: Request, res: Response) => {
 });
 
 /**
+ * =====================================================
  * GET /api/organization/pay-period/preview
- *
- * Query params:
- *  - date (optional)       → "YYYY-MM-DD", default = today
- *  - locationId (optional) → number, to apply per-location overrides
- *
- * Uses the PayPeriodEngine to compute:
- *  - start/end calendar dates
- *  - UTC date-time range for DB queries
+ * -----------------------------------------------------
+ * Calculates a pay-period window using the engine
+ * =====================================================
  */
-router.get("/preview", async (req: Request, res: Response) => {
-  try {
-    const orgId = (req as any).user?.organizationId;
-    if (!orgId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+router.get(
+  "/preview",
+  verifyToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId } = req.user as any;
+      const { date, locationId } = req.query;
 
-    const { date, locationId } = req.query;
-
-    // 1) Load organization
-    const org = await prisma.organization.findUnique({
-      where: { id: orgId },
-    });
-
-    if (!org) {
-      return res.status(404).json({ error: "Organization not found" });
-    }
-
-    // 2) Optional: load location for overrides
-    let location: any = null;
-    if (locationId) {
-      location = await prisma.location.findFirst({
-        where: {
-          id: Number(locationId),
-          organizationId: orgId,
-        },
+      // 1) Load organization
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
       });
+
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      // 2) Optional location override
+      let location = null;
+      if (locationId) {
+        location = await prisma.location.findFirst({
+          where: {
+            id: Number(locationId),
+            organizationId,
+          },
+        });
+      }
+
+      // 3) Build effective settings
+      const settings = buildEffectiveSettingsFromOrgAndLocation({
+        organization,
+        location,
+      });
+
+      // 4) Resolve target date
+      const targetDate = date ? new Date(String(date)) : new Date();
+
+      // 5) Compute pay period
+      const period = getPayPeriodRange(settings, targetDate);
+
+      return res.json({
+        organizationId,
+        locationId: location ? location.id : null,
+        settings,
+        period,
+      });
+    } catch (error) {
+      console.error("❌ GET /organization/pay-period/preview:", error);
+      return res
+        .status(500)
+        .json({ error: "Failed to calculate pay period" });
     }
-
-    // 3) Build effective settings (org + location)
-    const settings = buildEffectiveSettingsFromOrgAndLocation({
-      organization: org,
-      location,
-    });
-
-    // 4) Target date inside the pay period
-    const targetDate = date ? new Date(String(date)) : new Date();
-
-    // 5) Use engine to calculate range
-    const period = getPayPeriodRange(settings, targetDate);
-
-    return res.json({
-      organizationId: orgId,
-      locationId: location ? location.id : null,
-      settings,
-      period,
-    });
-  } catch (err) {
-    console.error("GET /api/organization/pay-period/preview error:", err);
-    return res
-      .status(500)
-      .json({ error: "Failed to calculate pay period" });
   }
-});
+);
 
 export default router;

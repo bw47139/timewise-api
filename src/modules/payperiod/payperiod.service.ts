@@ -1,9 +1,18 @@
+// src/modules/payperiod/payPeriod.service.ts
+
+import { PayPeriodType } from "../../utils/payPeriodEngine";
 import { PayPeriodRange, OrganizationLike } from "./payPeriod.types";
 
+/**
+ * -----------------------------------------------------
+ * WEEKLY
+ * -----------------------------------------------------
+ */
 function weekly(org: OrganizationLike, ref: Date): PayPeriodRange {
   const start = new Date(ref);
-  const target = org.weekStartDay ?? 0;
-  const diff = (ref.getDay() - target + 7) % 7;
+
+  const weekStartDay = org.weekStartDay ?? 0; // 0 = Sunday
+  const diff = (ref.getDay() - weekStartDay + 7) % 7;
 
   start.setDate(ref.getDate() - diff);
   start.setHours(0, 0, 0, 0);
@@ -14,17 +23,28 @@ function weekly(org: OrganizationLike, ref: Date): PayPeriodRange {
   return { startDate: start, endDate: end };
 }
 
+/**
+ * -----------------------------------------------------
+ * BI-WEEKLY
+ * -----------------------------------------------------
+ */
 function biweekly(org: OrganizationLike, ref: Date): PayPeriodRange {
   if (!org.biWeeklyAnchorDate) {
     throw new Error("biWeeklyAnchorDate is required for BIWEEKLY.");
   }
 
   const anchor = new Date(org.biWeeklyAnchorDate);
+  anchor.setHours(0, 0, 0, 0);
+
   const start = new Date(anchor);
 
+  // Walk forward until we pass ref
   while (start <= ref) {
     start.setDate(start.getDate() + 14);
   }
+
+  // Step back one period to get the active window
+  start.setDate(start.getDate() - 14);
 
   const end = new Date(start);
   end.setDate(start.getDate() + 14);
@@ -32,7 +52,15 @@ function biweekly(org: OrganizationLike, ref: Date): PayPeriodRange {
   return { startDate: start, endDate: end };
 }
 
-function semiMonthly(_org: OrganizationLike, ref: Date): PayPeriodRange {
+/**
+ * -----------------------------------------------------
+ * SEMI-MONTHLY
+ * -----------------------------------------------------
+ */
+function semiMonthly(
+  _org: OrganizationLike,
+  ref: Date
+): PayPeriodRange {
   const year = ref.getFullYear();
   const month = ref.getMonth();
   const day = ref.getDate();
@@ -50,7 +78,15 @@ function semiMonthly(_org: OrganizationLike, ref: Date): PayPeriodRange {
   };
 }
 
-function monthly(_org: OrganizationLike, ref: Date): PayPeriodRange {
+/**
+ * -----------------------------------------------------
+ * MONTHLY
+ * -----------------------------------------------------
+ */
+function monthly(
+  _org: OrganizationLike,
+  ref: Date
+): PayPeriodRange {
   const year = ref.getFullYear();
   const month = ref.getMonth();
 
@@ -60,20 +96,31 @@ function monthly(_org: OrganizationLike, ref: Date): PayPeriodRange {
   };
 }
 
+/**
+ * -----------------------------------------------------
+ * Compute pay period (enum-safe)
+ * -----------------------------------------------------
+ */
 export function computePayPeriod(
   org: OrganizationLike,
   refDate: Date
 ): PayPeriodRange {
   switch (org.payPeriodType) {
-    case "WEEKLY":
+    case PayPeriodType.WEEKLY:
       return weekly(org, refDate);
-    case "BIWEEKLY":
+
+    case PayPeriodType.BIWEEKLY:
       return biweekly(org, refDate);
-    case "SEMIMONTHLY":
+
+    case PayPeriodType.SEMIMONTHLY:
       return semiMonthly(org, refDate);
-    case "MONTHLY":
+
+    case PayPeriodType.MONTHLY:
       return monthly(org, refDate);
+
     default:
-      throw new Error(`Unsupported pay period type: ${org.payPeriodType}`);
+      throw new Error(
+        `Unsupported pay period type: ${org.payPeriodType}`
+      );
   }
 }

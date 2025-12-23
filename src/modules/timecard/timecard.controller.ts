@@ -1,31 +1,63 @@
 // src/modules/timecard/timecard.controller.ts
 
 import { Request, Response } from "express";
+import dayjs from "dayjs";
 
-import { getTimecardForRange } from "./timecard.service";
+import { timecardService } from "./timecard.service";
 
-export async function getTimecardHandler(req: Request, res: Response) {
+/**
+ * ------------------------------------------------------
+ * GET /api/timecard/employee/:id
+ *
+ * Query:
+ *   ?start=YYYY-MM-DD
+ *   ?end=YYYY-MM-DD
+ * ------------------------------------------------------
+ */
+export async function getEmployeeTimecard(
+  req: Request,
+  res: Response
+) {
   try {
-    // We support BOTH:
-    // - /api/timecards/1?start=YYYY-MM-DD&end=YYYY-MM-DD  (params)
-    // - /api/timecards?employeeId=1&start=YYYY-MM-DD&end=YYYY-MM-DD (query)
-    const employeeId = Number(
-      req.params.employeeId || req.query.employeeId
-    );
-    const start = req.query.start as string;
-    const end = req.query.end as string;
+    const employeeId = Number(req.params.id);
+    const { start, end } = req.query;
 
-    if (!employeeId || !start || !end) {
+    if (!employeeId || Number.isNaN(employeeId)) {
+      return res.status(400).json({ error: "Invalid employeeId" });
+    }
+
+    if (!start || !end) {
       return res.status(400).json({
-        error: "employeeId, start, and end are required",
+        error: "start and end query params are required (YYYY-MM-DD)",
       });
     }
 
-    const result = await getTimecardForRange(employeeId, start, end);
+    // --------------------------------------------------
+    // Convert query params → ISO dates (STRICT)
+    // --------------------------------------------------
+    const startDate = dayjs(String(start)).startOf("day");
+    const endDate = dayjs(String(end)).endOf("day");
 
-    res.json(result);
+    if (!startDate.isValid() || !endDate.isValid()) {
+      return res.status(400).json({
+        error: "Invalid date format. Use YYYY-MM-DD",
+      });
+    }
+
+    // --------------------------------------------------
+    // Delegate ALL logic to service
+    // --------------------------------------------------
+    const result = await timecardService.getSummary(
+      employeeId,
+      startDate.toISOString(),
+      endDate.toISOString()
+    );
+
+    return res.json(result);
   } catch (err) {
-    console.error("Timecard error:", err);
-    res.status(500).json({ error: "Failed to compute timecard" });
+    console.error("Timecard controller error:", err);
+    return res.status(500).json({
+      error: "Failed to load timecard",
+    });
   }
 }

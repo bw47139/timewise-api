@@ -1,14 +1,18 @@
-import PDFDocument from "pdfkit";
+// src/modules/reports/timesheetPdf.service.ts
 
-import { prisma } from "../../prisma";
+import PDFDocument from "pdfkit";
+import dayjs from "dayjs";
+import { PrismaClient } from "@prisma/client";
+
 import { uploadPdfToS3 } from "../../utils/uploadPdfToS3";
-import { prisma } from "../../prisma"; // adjust if your prisma path differs
+
+const prisma = new PrismaClient();
 
 interface GenerateTimesheetOptions {
   organizationId: number;
   employeeId: number;
-  start: string; // yyyy-mm-dd
-  end: string;
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
 }
 
 export async function generateTimesheetPdf({
@@ -17,9 +21,12 @@ export async function generateTimesheetPdf({
   start,
   end,
 }: GenerateTimesheetOptions) {
-  // -----------------------------
-  // 1. Fetch employee + punches
-  // -----------------------------
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T23:59:59`);
+
+  // --------------------------------------------------
+  // Load employee
+  // --------------------------------------------------
   const employee = await prisma.employee.findUnique({
     where: { id: employeeId },
     include: { organization: true },
@@ -29,83 +36,79 @@ export async function generateTimesheetPdf({
     throw new Error("Employee not found");
   }
 
+  // --------------------------------------------------
+  // Load punches (FIXED FIELD NAMES)
+  // --------------------------------------------------
   const punches = await prisma.punch.findMany({
     where: {
       employeeId,
-      punchTime: {
-        gte: new Date(start + "T00:00:00"),
-        lte: new Date(end + "T23:59:59"),
+      timestamp: {
+        gte: startDate,
+        lte: endDate,
       },
     },
-    orderBy: { punchTime: "asc" },
+    orderBy: { timestamp: "asc" },
   });
 
-  // -----------------------------
-  // 2. Start generating PDF
-  // -----------------------------
+  // --------------------------------------------------
+  // Create PDF
+  // --------------------------------------------------
   const doc = new PDFDocument({ margin: 40 });
-  const chunks: any[] = [];
+  const chunks: Buffer[] = [];
 
-  doc.on("data", (chunk) => chunks.push(chunk));
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
   doc.on("end", () => {});
 
-  // -----------------------------
-  // PDF HEADER
-  // -----------------------------
+  // --------------------------------------------------
+  // Header
+  // --------------------------------------------------
   doc.fontSize(22).text("Employee Timesheet", { align: "center" });
   doc.moveDown();
 
-  doc
-    .fontSize(12)
-    .text(`Company: ${employee.organization.name}`)
+  doc.fontSize(12)
+    .text(`Company: ${employee.organization?.name ?? ""}`)
     .text(`Employee: ${employee.firstName} ${employee.lastName}`)
     .text(`Employee ID: ${employee.id}`)
     .text(`Period: ${start} → ${end}`)
     .moveDown();
 
-  // -----------------------------
-  // TABLE HEADER
-  // -----------------------------
-  doc.fontSize(13).text("Punches:", { underline: true });
+  // --------------------------------------------------
+  // Punch Table
+  // --------------------------------------------------
+  doc.fontSize(13).text("Punches", { underline: true });
   doc.moveDown(0.5);
 
-  doc.fontSize(11).text("Time                  Type");
-
+  doc.fontSize(11).text("Date / Time                 Type");
   doc.moveDown(0.5);
 
-  // -----------------------------
-  // TABLE ROWS
-  // -----------------------------
   for (const p of punches) {
-    const t = new Date(p.punchTime).toLocaleString();
-    const type = p.punchType;
-    doc.text(`${t}      ${type}`);
+    doc.text(
+      `${dayjs(p.timestamp).format("YYYY-MM-DD HH:mm")}          ${p.type}`
+    );
   }
 
   doc.moveDown(2);
 
-  // -----------------------------
-  // SIGNATURE SECTION
-  // -----------------------------
-  doc
-    .fontSize(12)
-    .text("Employee Signature: ________________________________")
-    .moveDown();
+  // --------------------------------------------------
+  // Signatures
+  // --------------------------------------------------
+  doc.text("Employee Signature: ________________________________");
+  doc.moveDown();
   doc.text("Supervisor Signature: ________________________________");
 
-  // Finish PDF
   doc.end();
 
   const buffer = Buffer.concat(chunks);
 
-  // -----------------------------
-  // 3. Upload to S3
-  // -----------------------------
+  // --------------------------------------------------
+  // Upload to S3 (FIXED: contentType REQUIRED)
+  // --------------------------------------------------
   const uploaded = await uploadPdfToS3({
     organizationId,
     employeeId,
     filename: `timesheet-${start}-to-${end}.pdf`,
     buffer,
+    contentType: "application/pdf",
   });
 
   return {

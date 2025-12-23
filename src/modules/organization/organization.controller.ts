@@ -5,6 +5,17 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+/**
+ * Helper — strip undefined values
+ */
+function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const clean: any = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) clean[k] = v;
+  }
+  return clean;
+}
+
 /* ======================================================
    CREATE ORGANIZATION
 ====================================================== */
@@ -12,22 +23,24 @@ export const createOrganizationHandler = async (req: Request, res: Response) => 
   try {
     const { name, timezone } = req.body;
 
-    if (!name || !timezone) {
-      return res.status(400).json({ error: "Name and timezone are required" });
+    if (!name) {
+      return res.status(400).json({ error: "Organization name is required" });
     }
 
     const organization = await prisma.organization.create({
       data: {
         name,
-        timezone,
+        timezone: timezone ?? "America/New_York",
       },
     });
 
     return res.json(organization);
-
   } catch (error: any) {
     console.error("Create Organization Error:", error);
-    return res.status(500).json({ error: "Failed to create organization", details: error.message });
+    return res.status(500).json({
+      error: "Failed to create organization",
+      details: error?.message,
+    });
   }
 };
 
@@ -42,10 +55,12 @@ export const getOrganizationHandler = async (req: Request, res: Response) => {
       where: { id },
     });
 
-    if (!org) return res.status(404).json({ error: "Organization not found" });
+    if (!org) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
 
     return res.json(org);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Get Organization Error:", error);
     return res.status(500).json({ error: "Failed to load organization" });
   }
@@ -57,18 +72,35 @@ export const getOrganizationHandler = async (req: Request, res: Response) => {
 export const updateOrganizationHandler = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { name, timezone } = req.body;
+
+    const {
+      name,
+      timezone,
+      payPeriodType,
+      weekStartDay,
+      biweeklyAnchorDate,
+    } = req.body;
+
+    const data = stripUndefined({
+      name,
+      timezone,
+      payPeriodType,
+      weekStartDay,
+      biweeklyAnchorDate:
+        biweeklyAnchorDate === undefined
+          ? undefined
+          : biweeklyAnchorDate === null
+          ? null
+          : new Date(biweeklyAnchorDate),
+    });
 
     const org = await prisma.organization.update({
       where: { id },
-      data: {
-        name,
-        timezone,
-      },
+      data,
     });
 
     return res.json(org);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update Organization Error:", error);
     return res.status(500).json({ error: "Failed to update organization" });
   }
@@ -86,7 +118,7 @@ export const deleteOrganizationHandler = async (req: Request, res: Response) => 
     });
 
     return res.json({ message: "Organization deleted" });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Delete Organization Error:", error);
     return res.status(500).json({ error: "Failed to delete organization" });
   }
@@ -105,13 +137,17 @@ export const getAutoLunchSettings = async (req: Request, res: Response) => {
         autoLunchEnabled: true,
         autoLunchMinutes: true,
         autoLunchMinimumShift: true,
+        autoLunchDeductOnce: true,
+        autoLunchIgnoreIfBreak: true,
       },
     });
 
-    if (!org) return res.status(404).json({ error: "Organization not found" });
+    if (!org) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
 
     return res.json(org);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Get Auto-Lunch Error:", error);
     return res.status(500).json({ error: "Failed to load auto-lunch settings" });
   }
@@ -120,26 +156,35 @@ export const getAutoLunchSettings = async (req: Request, res: Response) => {
 export const updateAutoLunchSettings = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { autoLunchEnabled, autoLunchMinutes, autoLunchMinimumShift } = req.body;
+
+    const {
+      autoLunchEnabled,
+      autoLunchMinutes,
+      autoLunchMinimumShift,
+      autoLunchDeductOnce,
+      autoLunchIgnoreIfBreak,
+    } = req.body;
 
     const settings = await prisma.organization.update({
       where: { id },
-      data: {
+      data: stripUndefined({
         autoLunchEnabled,
         autoLunchMinutes,
         autoLunchMinimumShift,
-      },
+        autoLunchDeductOnce,
+        autoLunchIgnoreIfBreak,
+      }),
     });
 
     return res.json(settings);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update Auto-Lunch Error:", error);
     return res.status(500).json({ error: "Failed to update auto-lunch settings" });
   }
 };
 
 /* ======================================================
-   PAY PERIOD SETTINGS
+   PAY PERIOD SETTINGS (READ ONLY)
 ====================================================== */
 export const getPayPeriodHandler = async (req: Request, res: Response) => {
   try {
@@ -149,14 +194,17 @@ export const getPayPeriodHandler = async (req: Request, res: Response) => {
       where: { id },
       select: {
         payPeriodType: true,
-        payPeriodAnchorDate: true,
+        weekStartDay: true,
+        biweeklyAnchorDate: true,
       },
     });
 
-    if (!org) return res.status(404).json({ error: "Organization not found" });
+    if (!org) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
 
     return res.json(org);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Get Pay Period Error:", error);
     return res.status(500).json({ error: "Failed to load pay period settings" });
   }

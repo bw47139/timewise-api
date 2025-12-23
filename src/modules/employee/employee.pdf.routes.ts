@@ -1,10 +1,11 @@
 // src/modules/employee/employee.pdf.routes.ts
+
 import { Router, Request, Response } from "express";
 import PDFDocument from "pdfkit";
 import { PrismaClient } from "@prisma/client";
+import dayjs from "dayjs";
 
 import { uploadPdfToS3 } from "../../utils/uploadPdfToS3";
-import dayjs from "dayjs";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -18,17 +19,21 @@ const router = Router();
 router.get("/pdf/:id", async (req: Request, res: Response) => {
   try {
     const employeeId = Number(req.params.id);
-    const { organizationId } = (req as any).user || {}; // verifyToken applied in parent
+    const { organizationId } = (req as any).user || {};
 
-    if (!employeeId) {
-      return res.status(400).json({ error: "Missing employeeId" });
+    if (!employeeId || !organizationId) {
+      return res.status(400).json({ error: "Invalid request" });
     }
 
     // ------------------------------------------
     // Load employee with related data
     // ------------------------------------------
     const employee = await prisma.employee.findFirst({
-      where: { id: employeeId, organizationId, isDeleted: false },
+      where: {
+        id: employeeId,
+        organizationId,
+        isDeleted: false,
+      },
       include: {
         payRates: {
           orderBy: { effectiveDate: "desc" },
@@ -36,7 +41,6 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
         emergencyContacts: true,
         notes: true,
         documents: true,
-        photos: true,
       },
     });
 
@@ -53,19 +57,19 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
     });
 
     const chunks: Buffer[] = [];
-    doc.on("data", (c) => chunks.push(c));
+    doc.on("data", (c: Buffer) => chunks.push(c));
+
     doc.on("end", async () => {
       const buffer = Buffer.concat(chunks);
 
-      // ------------------------------------------
-      // Upload to S3
-      // ------------------------------------------
       const filename = `employee-profile-${employee.id}.pdf`;
+
       const result = await uploadPdfToS3({
         organizationId,
         employeeId,
         filename,
         buffer,
+        contentType: "application/pdf", // ✅ REQUIRED
       });
 
       return res.json({
@@ -79,7 +83,9 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
     // ------------------------------------------
     doc.fontSize(20).text("Employee Profile Report", { align: "center" });
     doc.moveDown(0.5);
-    doc.fontSize(12).text(dayjs().format("MMMM D, YYYY"), { align: "center" });
+    doc.fontSize(12).text(dayjs().format("MMMM D, YYYY"), {
+      align: "center",
+    });
     doc.moveDown(1.5);
 
     // ------------------------------------------
@@ -88,15 +94,22 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
     doc.fontSize(16).text("Personal Information", { underline: true });
     doc.moveDown(0.5);
 
-    doc.fontSize(12).text(`Name: ${employee.firstName} ${employee.lastName}`);
-    if (employee.preferredName)
+    doc.fontSize(12).text(
+      `Name: ${employee.firstName} ${employee.lastName}`
+    );
+    if (employee.preferredName) {
       doc.text(`Preferred Name: ${employee.preferredName}`);
+    }
     doc.text(`Email: ${employee.email || "—"}`);
     doc.text(`Phone: ${employee.phoneNumber || "—"}`);
     doc.text(`Address: ${employee.addressLine1 || ""}`);
-    if (employee.addressLine2) doc.text(employee.addressLine2);
+    if (employee.addressLine2) {
+      doc.text(employee.addressLine2);
+    }
     doc.text(
-      `${employee.city || ""}, ${employee.state || ""} ${employee.postalCode || ""}`
+      `${employee.city || ""}, ${employee.state || ""} ${
+        employee.postalCode || ""
+      }`
     );
     doc.moveDown(1);
 
@@ -109,7 +122,11 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
     doc.fontSize(12).text(`Job Title: ${employee.jobTitle || "—"}`);
     doc.text(`Department: ${employee.department || "—"}`);
     doc.text(
-      `Hire Date: ${employee.hireDate ? dayjs(employee.hireDate).format("MMM D, YYYY") : "—"}`
+      `Hire Date: ${
+        employee.hireDate
+          ? dayjs(employee.hireDate).format("MMM D, YYYY")
+          : "—"
+      }`
     );
     doc.text(`Status: ${employee.status}`);
     doc.moveDown(1);
@@ -125,9 +142,9 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
     } else {
       employee.payRates.forEach((rate) => {
         doc.fontSize(12).text(
-          `• $${rate.rate.toFixed(2)} starting ${dayjs(rate.effectiveDate).format(
-            "MMM D, YYYY"
-          )}`
+          `• $${rate.rate.toFixed(2)} starting ${dayjs(
+            rate.effectiveDate
+          ).format("MMM D, YYYY")}`
         );
       });
     }
@@ -143,7 +160,9 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
       doc.fontSize(12).text("No contacts available.");
     } else {
       employee.emergencyContacts.forEach((c) => {
-        doc.fontSize(12).text(`• ${c.name} — ${c.relationship} — ${c.phone}`);
+        doc.fontSize(12).text(
+          `• ${c.name} — ${c.relationship} — ${c.phone}`
+        );
       });
     }
     doc.moveDown(1);
@@ -187,7 +206,9 @@ router.get("/pdf/:id", async (req: Request, res: Response) => {
     doc.end();
   } catch (err) {
     console.error("❌ Employee PDF error:", err);
-    return res.status(500).json({ error: "Failed to generate employee PDF" });
+    return res
+      .status(500)
+      .json({ error: "Failed to generate employee PDF" });
   }
 });
 

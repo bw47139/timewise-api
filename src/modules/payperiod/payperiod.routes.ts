@@ -1,3 +1,5 @@
+// src/modules/payperiod/payperiod.routes.ts
+
 import { Router, Request, Response } from "express";
 import { PrismaClient, PayrollPeriodStatus } from "@prisma/client";
 import { verifyToken } from "../../middleware/verifyToken";
@@ -12,6 +14,7 @@ const prisma = new PrismaClient();
  */
 function requireManagerOrAdmin(req: Request) {
   const user = (req as any).user as { id: number; role?: string } | undefined;
+
   if (!user || !user.role) {
     const error = new Error("Unauthorized");
     (error as any).statusCode = 401;
@@ -40,13 +43,15 @@ router.get("/ping", (_req, res) => {
 /**
  * ------------------------------------------------------
  * POST /api/payperiod/generate
- * (KEEPING YOUR ORIGINAL CODE)
+ * Generate payroll periods (admin only)
  * ------------------------------------------------------
  */
-router.post("/generate", async (_req, res) => {
+router.post("/generate", verifyToken, async (req, res) => {
   try {
-    const monthsAhead = Number(_req.query.monthsAhead ?? 3);
-    const monthsBack = Number(_req.query.monthsBack ?? 1);
+    requireManagerOrAdmin(req);
+
+    const monthsAhead = Number(req.query.monthsAhead ?? 3);
+    const monthsBack = Number(req.query.monthsBack ?? 1);
 
     const locations = await prisma.location.findMany({
       select: {
@@ -70,10 +75,11 @@ router.post("/generate", async (_req, res) => {
     let createdCount = 0;
 
     for (const loc of locations) {
-      const type = (loc.payPeriodType || "WEEKLY").toUpperCase();
-      const weekStartDay = loc.weekStartDay ?? 1; // Monday default
+      const type = loc.payPeriodType;
+      const weekStartDay = loc.weekStartDay ?? 1;
 
-      const daysPerPeriod = type.includes("BI") ? 14 : 7;
+      const daysPerPeriod =
+        type === "BIWEEKLY" ? 14 : 7;
 
       let cursor = alignToWeekStart(startWindow, weekStartDay);
 
@@ -82,7 +88,7 @@ router.post("/generate", async (_req, res) => {
         startDate.setHours(0, 0, 0, 0);
 
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + daysPerPeriod - 1);
+        endDate.setDate(startDate.getDate() + daysPerPeriod - 1);
         endDate.setHours(23, 59, 59, 999);
 
         try {
@@ -92,6 +98,7 @@ router.post("/generate", async (_req, res) => {
               locationId: loc.id,
               startDate,
               endDate,
+              status: PayrollPeriodStatus.OPEN,
             },
           });
           createdCount++;
@@ -109,7 +116,7 @@ router.post("/generate", async (_req, res) => {
     });
   } catch (err: any) {
     console.error(err);
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
       error: err.message || "Failed to generate payroll periods",
     });
   }
@@ -118,10 +125,9 @@ router.post("/generate", async (_req, res) => {
 /**
  * ------------------------------------------------------
  * GET /api/payperiod
- * (KEEPING YOUR ORIGINAL)
  * ------------------------------------------------------
  */
-router.get("/", async (_req, res) => {
+router.get("/", verifyToken, async (_req, res) => {
   try {
     const rows = await prisma.payrollPeriod.findMany({
       orderBy: { startDate: "desc" },
@@ -148,7 +154,6 @@ router.get("/", async (_req, res) => {
 /**
  * ------------------------------------------------------
  * GET /api/payperiod/:id
- * (new, needed by frontend)
  * ------------------------------------------------------
  */
 router.get("/:id", verifyToken, async (req, res) => {
@@ -260,8 +265,7 @@ router.post("/:id/approve", verifyToken, async (req, res) => {
 
     res.json(updated);
   } catch (err: any) {
-    const statusCode = err.statusCode || 500;
-    res.status(statusCode).json({
+    res.status(err.statusCode || 500).json({
       error: err.message || "Failed to approve payroll period",
     });
   }
@@ -291,8 +295,10 @@ router.post("/:id/unlock", verifyToken, async (req, res) => {
     }
 
     if (
-      period.status !== PayrollPeriodStatus.APPROVED &&
-      period.status !== PayrollPeriodStatus.LOCKED
+      ![
+        PayrollPeriodStatus.APPROVED,
+        PayrollPeriodStatus.LOCKED,
+      ].includes(period.status)
     ) {
       return res
         .status(400)
@@ -328,8 +334,7 @@ router.post("/:id/unlock", verifyToken, async (req, res) => {
 
     res.json(updated);
   } catch (err: any) {
-    const statusCode = err.statusCode || 500;
-    res.status(statusCode).json({
+    res.status(err.statusCode || 500).json({
       error: err.message || "Failed to unlock payroll period",
     });
   }
@@ -355,7 +360,10 @@ export async function isDateLockedForOrg(
       startDate: { lte: targetDate },
       endDate: { gte: targetDate },
       status: {
-        in: [PayrollPeriodStatus.APPROVED, PayrollPeriodStatus.LOCKED],
+        in: [
+          PayrollPeriodStatus.APPROVED,
+          PayrollPeriodStatus.LOCKED,
+        ],
       },
     },
   });
@@ -366,7 +374,6 @@ export async function isDateLockedForOrg(
 /**
  * ------------------------------------------------------
  * Helper: Align date to week start
- * (KEEPING YOUR ORIGINAL)
  * ------------------------------------------------------
  */
 function alignToWeekStart(date: Date, weekStartDay: number) {

@@ -12,6 +12,13 @@ datasource db {
 // ENUMS
 // =========================================================
 //
+enum PayPeriodType {
+  WEEKLY
+  BIWEEKLY
+  SEMIMONTHLY
+  MONTHLY
+}
+
 enum EmployeeStatus {
   ACTIVE
   INACTIVE
@@ -55,10 +62,11 @@ model Organization {
   zipcode String?
   logoUrl String?
 
-  payPeriodType      String    @default("WEEKLY")
-  weekStartDay       Int?      @default(1)
+  payPeriodType      PayPeriodType @default(WEEKLY)
+  weekStartDay       Int?          @default(1)
   biweeklyAnchorDate DateTime?
-  cutoffTime         String?   @default("17:00")
+  monthlyCutDay      Int?          @default(1) // ✅ ADDED (fix for monthly pay periods)
+  cutoffTime         String?       @default("17:00")
 
   overtimeDailyThresholdHours   Float @default(8.0)
   overtimeWeeklyThresholdHours  Float @default(40.0)
@@ -96,11 +104,10 @@ model Location {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  // ⭐ Industry chosen by Location (string reference)
-  industry       String?
+  industry String?
 
-  payPeriodType      String    @default("WEEKLY")
-  weekStartDay       Int?      @default(1)
+  payPeriodType      PayPeriodType @default(WEEKLY)
+  weekStartDay       Int?          @default(1)
   biweeklyAnchorDate DateTime?
 
   semiMonthCut1 Int? @default(1)
@@ -134,6 +141,7 @@ model Location {
 // =========================================================
 // EMPLOYEE MODEL
 // =========================================================
+//
 model Employee {
   id             Int @id @default(autoincrement())
   organizationId Int
@@ -196,26 +204,24 @@ model Employee {
   ptoRequests     PtoRequest[]
 }
 
+//
+// =========================================================
+// REMAINDER OF MODELS (UNCHANGED)
+// =========================================================
+//
 model EmergencyContact {
   id         Int @id @default(autoincrement())
   employeeId Int
-
-  name     String
-  phone    String
-  relation String
-
-  createdAt DateTime @default(now())
+  name       String
+  phone      String
+  relation   String
+  createdAt  DateTime @default(now())
 
   employee Employee @relation(fields: [employeeId], references: [id])
 
   @@index([employeeId])
 }
 
-//
-// =========================================================
-// REMAINDER OF EXISTING MODELS
-// =========================================================
-//
 model Punch {
   id         Int      @id @default(autoincrement())
   employeeId Int
@@ -233,7 +239,7 @@ model Punch {
 }
 
 model PayrollPeriod {
-  id             Int  @id @default(autoincrement())
+  id             Int @id @default(autoincrement())
   organizationId Int
   locationId     Int?
 
@@ -452,11 +458,6 @@ model Device {
   location Location @relation(fields: [locationId], references: [id])
 }
 
-//
-// =========================================================
-// GLOBAL INDUSTRY SYSTEM (Option 2)
-// =========================================================
-//
 model Industry {
   id        Int      @id @default(autoincrement())
   name      String   @unique
@@ -490,7 +491,7 @@ model JobTitle {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  industry   Industry   @relation(fields: [industryId], references: [id])
+  industry   Industry    @relation(fields: [industryId], references: [id])
   department Department? @relation(fields: [departmentId], references: [id])
 
   @@unique([industryId, name, departmentId])

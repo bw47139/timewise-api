@@ -1,7 +1,8 @@
 // src/modules/location/location.settings.routes.ts
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { verifyToken } from "../../middleware/verifyToken";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -9,115 +10,110 @@ const router = Router();
 /**
  * GET /api/location/:id/settings
  */
-router.get("/:id/settings", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
+router.get(
+  "/:id/settings",
+  verifyToken,
+  async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
 
-    const location = await prisma.location.findUnique({
-      where: { id },
-      include: {
-        autoLunch: true,
-        overtime: true,
-      },
-    });
+      const location = await prisma.location.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
 
-    if (!location) {
-      return res.status(404).json({ error: "Location not found" });
+          // ✅ Auto-lunch (flat fields)
+          autoLunchEnabled: true,
+          autoLunchMinutes: true,
+          autoLunchMinimumShift: true,
+          autoLunchDeductOnce: true,
+          autoLunchIgnoreIfBreak: true,
+
+          // ✅ Overtime (flat fields)
+          overtimeDailyThresholdHours: true,
+          overtimeWeeklyThresholdHours: true,
+          doubletimeDailyThresholdHours: true,
+        },
+      });
+
+      if (!location) {
+        return res.status(404).json({ error: "Location not found" });
+      }
+
+      return res.json(location);
+    } catch (error) {
+      console.error("Error GET location settings:", error);
+      return res
+        .status(500)
+        .json({ error: "Could not load location settings" });
     }
-
-    res.json(location);
-  } catch (error) {
-    console.error("Error GET location settings:", error);
-    res.status(500).json({ error: "Could not load location settings" });
   }
-});
+);
 
 /**
  * PATCH /api/location/:id/settings
  */
-router.patch("/:id/settings", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const {
-      autoLunchEnabled,
-      autoLunchMinutes,
-      autoLunchMinShift,
-      autoLunchOncePerShift,
-      autoLunchSkipIfBreak,
+router.patch(
+  "/:id/settings",
+  verifyToken,
+  async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
 
-      overtimeRule,
-      dailyEnabled,
-      dailyThreshold,
-      doubleEnabled,
-      doubleThreshold,
-      weeklyEnabled,
-      weeklyThreshold,
-    } = req.body;
+      const {
+        autoLunchEnabled,
+        autoLunchMinutes,
+        autoLunchMinimumShift,
+        autoLunchDeductOnce,
+        autoLunchIgnoreIfBreak,
 
-    // Update Auto-Lunch
-    await prisma.location.update({
-      where: { id },
-      data: {
-        autoLunch: {
-          upsert: {
-            create: {
-              enabled: autoLunchEnabled,
-              minutes: autoLunchMinutes,
-              minShiftHours: autoLunchMinShift,
-              oncePerShift: autoLunchOncePerShift,
-              skipIfBreak: autoLunchSkipIfBreak,
-            },
-            update: {
-              enabled: autoLunchEnabled,
-              minutes: autoLunchMinutes,
-              minShiftHours: autoLunchMinShift,
-              oncePerShift: autoLunchOncePerShift,
-              skipIfBreak: autoLunchSkipIfBreak,
-            },
-          },
-        },
-      },
-    });
+        overtimeDailyThresholdHours,
+        overtimeWeeklyThresholdHours,
+        doubletimeDailyThresholdHours,
+      } = req.body;
 
-    // Update Overtime
-    await prisma.location.update({
-      where: { id },
-      data: {
-        overtime: {
-          upsert: {
-            create: {
-              rule: overtimeRule,
-              dailyEnabled,
-              dailyThresholdHours: dailyThreshold,
-              doubleEnabled,
-              doubleThresholdHours: doubleThreshold,
-              weeklyEnabled,
-              weeklyThresholdHours: weeklyThreshold,
-            },
-            update: {
-              rule: overtimeRule,
-              dailyEnabled,
-              dailyThresholdHours: dailyThreshold,
-              doubleEnabled,
-              doubleThresholdHours: doubleThreshold,
-              weeklyEnabled,
-              weeklyThresholdHours: weeklyThreshold,
-            },
-          },
-        },
-      },
-    });
+      const data: any = {};
 
-    // ⭐ RETURN SUCCESS JSON
-    res.json({
-      success: true,
-      message: "Location settings updated successfully",
-    });
+      // Auto-lunch
+      if (autoLunchEnabled !== undefined)
+        data.autoLunchEnabled = autoLunchEnabled;
+      if (autoLunchMinutes !== undefined)
+        data.autoLunchMinutes = autoLunchMinutes;
+      if (autoLunchMinimumShift !== undefined)
+        data.autoLunchMinimumShift = autoLunchMinimumShift;
+      if (autoLunchDeductOnce !== undefined)
+        data.autoLunchDeductOnce = autoLunchDeductOnce;
+      if (autoLunchIgnoreIfBreak !== undefined)
+        data.autoLunchIgnoreIfBreak = autoLunchIgnoreIfBreak;
 
-  } catch (error) {
-    console.error("Error PATCH location settings:", error);
-    res.status(500).json({ error: "Failed to update settings" });
+      // Overtime
+      if (overtimeDailyThresholdHours !== undefined)
+        data.overtimeDailyThresholdHours =
+          overtimeDailyThresholdHours;
+      if (overtimeWeeklyThresholdHours !== undefined)
+        data.overtimeWeeklyThresholdHours =
+          overtimeWeeklyThresholdHours;
+      if (doubletimeDailyThresholdHours !== undefined)
+        data.doubletimeDailyThresholdHours =
+          doubletimeDailyThresholdHours;
+
+      await prisma.location.update({
+        where: { id },
+        data,
+      });
+
+      return res.json({
+        success: true,
+        message: "Location settings updated successfully",
+      });
+    } catch (error) {
+      console.error("Error PATCH location settings:", error);
+      return res
+        .status(500)
+        .json({ error: "Failed to update settings" });
+    }
   }
-});
+);
 
 export default router;

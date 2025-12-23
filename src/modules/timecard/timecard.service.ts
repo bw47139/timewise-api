@@ -1,5 +1,3 @@
-// src/modules/timecard/timecard.service.ts
-
 import { PrismaClient } from "@prisma/client";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -42,6 +40,35 @@ interface DailySummary {
   formattedOvertime: string;
   formattedDoubletime: string;
 }
+
+/* ======================================================
+   ✅ REQUIRED EXPORT — USED BY CONTROLLER / ROUTES
+   ====================================================== */
+
+/**
+ * Load punches for an employee within a date range
+ * (Used by timecard.controller.ts and reports)
+ */
+export async function getTimecardForRange(
+  employeeId: number,
+  start: Date,
+  end: Date
+) {
+  return prisma.punch.findMany({
+    where: {
+      employeeId,
+      timestamp: {
+        gte: start,
+        lte: end,
+      },
+    },
+    orderBy: { timestamp: "asc" },
+  });
+}
+
+/* ======================================================
+   MAIN SERVICE
+   ====================================================== */
 
 export const timecardService = {
   async getSummary(employeeId: number, start: string, end: string) {
@@ -90,7 +117,9 @@ export const timecardService = {
 
     for (const [date, dayPunches] of daysMap.entries()) {
       dayPunches.sort(
-        (a, b) => dayjs.utc(a.timestamp).valueOf() - dayjs.utc(b.timestamp).valueOf()
+        (a, b) =>
+          dayjs.utc(a.timestamp).valueOf() -
+          dayjs.utc(b.timestamp).valueOf()
       );
 
       const paired = pairPunches(dayPunches);
@@ -215,14 +244,10 @@ function pairPunches(punches: any[]): PairedShift[] {
 }
 
 /* -----------------------------
-   Daily Totals (UPDATED FOR LOCATION)
+   Daily Totals (LOCATION AWARE)
 ----------------------------- */
 
-function calculateDailyTotals(
-  pairs: PairedShift[],
-  org: any,
-  loc: any
-) {
+function calculateDailyTotals(pairs: PairedShift[], org: any, loc: any) {
   let rawMinutes = 0;
   let exactSeconds = 0;
   let exactMinutes = 0;
@@ -237,9 +262,6 @@ function calculateDailyTotals(
 
   const rawHours = rawMinutes / 60;
 
-  /* ------------------------------------------
-     ⭐ AUTO-LUNCH — LOCATION OVERRIDES ORG
-  ------------------------------------------ */
   const autoLunchEnabled = loc?.autoLunchEnabled ?? org?.autoLunchEnabled;
   const autoLunchMinutes = loc?.autoLunchMinutes ?? org?.autoLunchMinutes;
   const autoLunchMinimumShift =
@@ -248,30 +270,31 @@ function calculateDailyTotals(
   let autoLunchDeduct = 0;
 
   if (autoLunchEnabled && rawHours >= autoLunchMinimumShift) {
-    autoLunchDeduct = autoLunchMinutes; // minutes
+    autoLunchDeduct = autoLunchMinutes;
   }
 
   let netMinutes = Math.max(0, rawMinutes - autoLunchDeduct);
   const netHours = netMinutes / 60;
 
-  /* ------------------------------------------
-     ⭐ OVERTIME — LOCATION OVERRIDES
-  ------------------------------------------ */
+  const otDaily =
+    (loc?.overtimeDailyThresholdHours ??
+      org?.overtimeDailyThresholdHours ??
+      8) * 60;
 
-  const otDaily = (loc?.overtimeDailyThresholdHours ?? org?.overtimeDailyThresholdHours ?? 8) * 60;
-  const dtDaily = (loc?.doubletimeDailyThresholdHours ?? org?.doubletimeDailyThresholdHours ?? 12) * 60;
+  const dtDaily =
+    (loc?.doubletimeDailyThresholdHours ??
+      org?.doubletimeDailyThresholdHours ??
+      12) * 60;
 
   let regularMinutes = netMinutes;
   let otMinutes = 0;
   let dtMinutes = 0;
 
-  // Double-time first
   if (netMinutes > dtDaily) {
     dtMinutes = netMinutes - dtDaily;
     netMinutes = dtDaily;
   }
 
-  // Overtime next
   if (netMinutes > otDaily) {
     otMinutes = netMinutes - otDaily;
     regularMinutes = otDaily;

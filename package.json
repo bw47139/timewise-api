@@ -9,10 +9,18 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "npx prisma generate && tsc",
-    "start": "node dist/server.js",
+
+    "typecheck": "tsc --noEmit",
+
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
+
+    "build": "npm run prisma:generate && npm run typecheck",
+
+    "predeploy": "npm run build",
+
+    "start": "node dist/server.js",
+
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix"
   },

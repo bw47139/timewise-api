@@ -2,7 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 
-import { computePayPeriod } from "../payperiod/payPeriod.service";
+import { computePayPeriod } from "../payperiod/payperiod.service";
 
 const prisma = new PrismaClient();
 

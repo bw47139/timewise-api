@@ -1,7 +1,7 @@
 // src/modules/timecard/timecard.routes.ts
 // CANONICAL ROUTES FILE — NO BUSINESS LOGIC
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { verifyToken } from "../../middleware/verifyToken";
 import { getEmployeeTimecard } from "./timecard.controller";
 

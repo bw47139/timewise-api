@@ -1,6 +1,6 @@
 // src/modules/payrate/index.ts
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import payRateRoutes from "./payrate.routes";
 import { verifyToken } from "../../middleware/verifyToken";
 

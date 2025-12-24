@@ -1,16 +1,29 @@
 // src/modules/organization/pay-period.routes.ts
 
 import { Router, Request, Response } from "express";
-import { PayPeriodType } from "../../utils/payPeriodEngine";
-
 import { prisma } from "../../prisma";
 import { verifyToken } from "../../middleware/verifyToken";
+
 import {
   getPayPeriodRange,
   buildEffectiveSettingsFromOrgAndLocation,
-} from "../../utils/payPeriodEngine";
+} from "../../utils/payperiod.engine";
 
 const router = Router();
+
+/**
+ * -----------------------------------------------------
+ * Runtime-safe PayPeriodType validation
+ * -----------------------------------------------------
+ */
+const VALID_PAY_PERIOD_TYPES = [
+  "WEEKLY",
+  "BIWEEKLY",
+  "SEMIMONTHLY",
+  "MONTHLY",
+] as const;
+
+type ValidPayPeriodType = (typeof VALID_PAY_PERIOD_TYPES)[number];
 
 /**
  * =====================================================
@@ -30,11 +43,8 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
         timezone: true,
         payPeriodType: true,
         weekStartDay: true,
-        biweeklyAnchorDate: true, // ✅ FIXED
+        biweeklyAnchorDate: true,
         cutoffTime: true,
-        semiMonthCut1: true,
-        semiMonthCut2: true,
-        monthlyCutDay: true,
       },
     });
 
@@ -65,17 +75,19 @@ router.patch("/", verifyToken, async (req: Request, res: Response) => {
     const {
       payPeriodType,
       weekStartDay,
-      biweeklyAnchorDate, // ✅ FIXED
+      biweeklyAnchorDate,
       cutoffTime,
-      semiMonthCut1,
-      semiMonthCut2,
-      monthlyCutDay,
-    } = req.body;
+    } = req.body as {
+      payPeriodType?: string;
+      weekStartDay?: number;
+      biweeklyAnchorDate?: string | null;
+      cutoffTime?: string | null;
+    };
 
-    // ---- Validate PayPeriodType ----
+    // ---- Validate payPeriodType ----
     if (
       payPeriodType !== undefined &&
-      !Object.values(PayPeriodType).includes(payPeriodType)
+      !VALID_PAY_PERIOD_TYPES.includes(payPeriodType as ValidPayPeriodType)
     ) {
       return res.status(400).json({
         error: "Invalid payPeriodType",
@@ -95,24 +107,24 @@ router.patch("/", verifyToken, async (req: Request, res: Response) => {
     const updated = await prisma.organization.update({
       where: { id: organizationId },
       data: {
-        ...(payPeriodType !== undefined && { payPeriodType }),
+        ...(payPeriodType !== undefined && {
+          payPeriodType: payPeriodType as ValidPayPeriodType,
+        }),
         ...(weekStartDay !== undefined && { weekStartDay }),
-        ...(biweeklyAnchorDate !== undefined && { biweeklyAnchorDate }), // ✅ FIXED
+        ...(biweeklyAnchorDate !== undefined && {
+          biweeklyAnchorDate: biweeklyAnchorDate
+            ? new Date(biweeklyAnchorDate)
+            : null,
+        }),
         ...(cutoffTime !== undefined && { cutoffTime }),
-        ...(semiMonthCut1 !== undefined && { semiMonthCut1 }),
-        ...(semiMonthCut2 !== undefined && { semiMonthCut2 }),
-        ...(monthlyCutDay !== undefined && { monthlyCutDay }),
       },
       select: {
         id: true,
         timezone: true,
         payPeriodType: true,
         weekStartDay: true,
-        biweeklyAnchorDate: true, // ✅ FIXED
+        biweeklyAnchorDate: true,
         cutoffTime: true,
-        semiMonthCut1: true,
-        semiMonthCut2: true,
-        monthlyCutDay: true,
       },
     });
 

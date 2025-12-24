@@ -1,6 +1,6 @@
 // src/modules/payroll-period/index.ts
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import coreRoutes from "./payrollPeriod.routes";
 import detailRoutes from "./payrollPeriod.detail.routes";
 

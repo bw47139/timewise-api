@@ -1,5 +1,5 @@
 // src/modules/auth/router.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 import authRoutes from "./auth.routes";
 

@@ -7,7 +7,7 @@ interface UploadPdfOptions {
   employeeId?: string | number;
   filename: string;
   buffer: Buffer;
-  contentType: string;
+  contentType?: string;
 }
 
 export async function uploadPdfToS3({

@@ -1,5 +1,5 @@
 // src/modules/router.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { publicRouter, protectedRouter } from "./autoRouter";
 
 /**

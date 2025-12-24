@@ -1,54 +1,54 @@
 // src/modules/audit/audit.service.ts
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
+import { AuditAction } from "./audit.actions";
 
 const prisma = new PrismaClient();
 
 /**
  * ------------------------------------------------------
- * Canonical Audit Log Writer
+ * JSON-safe serializer
  * ------------------------------------------------------
- *
- * Prisma AuditLog model fields:
- * - userId
- * - userEmail
- * - action
- * - entityType
- * - entityId
- * - method
- * - path
- * - ipAddress
- * - metadata
- * - createdAt
- *
- * Any legacy or extra fields are safely stored in metadata.
+ * Converts Date objects to ISO strings so metadata
+ * always conforms to Prisma JSON input rules.
  */
-export async function createAuditLog(params: {
-  action: string;
+function serializeForJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(
+    JSON.stringify(value, (_key, val) =>
+      val instanceof Date ? val.toISOString() : val
+    )
+  ) as Prisma.InputJsonValue;
+}
 
-  // Actor
+/**
+ * ------------------------------------------------------
+ * Canonical Audit Log Writer (HARDENED)
+ * ------------------------------------------------------
+ */
+export interface CreateAuditLogParams {
+  action: AuditAction;
+
   userId?: number | null;
   userEmail?: string | null;
 
-  // Entity being acted on
   entityType?: string | null;
   entityId?: string | number | null;
 
-  // Request context
   method?: string | null;
   path?: string | null;
   ipAddress?: string | null;
 
-  // Legacy / extra info (safe to pass)
+  metadata?: Prisma.InputJsonValue;
+
+  // legacy
   tableName?: string;
   recordId?: number;
-  beforeData?: any;
-  afterData?: any;
+  beforeData?: unknown;
+  afterData?: unknown;
   reason?: string | null;
+}
 
-  // Any additional metadata
-  metadata?: Record<string, any>;
-}) {
+export async function createAuditLog(params: CreateAuditLogParams) {
   const {
     action,
     userId,
@@ -58,39 +58,48 @@ export async function createAuditLog(params: {
     method,
     path,
     ipAddress,
+    metadata,
     tableName,
     recordId,
     beforeData,
     afterData,
     reason,
-    metadata,
   } = params;
+
+  const resolvedEntityType = entityType ?? tableName ?? null;
+  const resolvedEntityId =
+    entityId != null
+      ? String(entityId)
+      : recordId != null
+      ? String(recordId)
+      : null;
+
+  const metadataObj = {
+    ...(typeof metadata === "object" && metadata !== null ? metadata : {}),
+    ...(beforeData !== undefined ? { beforeData } : {}),
+    ...(afterData !== undefined ? { afterData } : {}),
+    ...(reason ? { reason } : {}),
+    ...(tableName ? { legacyTableName: tableName } : {}),
+    ...(recordId ? { legacyRecordId: recordId } : {}),
+  };
+
+  // ✅ Prisma-safe: undefined means “no metadata”
+  const resolvedMetadata: Prisma.InputJsonValue | undefined =
+    Object.keys(metadataObj).length > 0
+      ? serializeForJson(metadataObj)
+      : undefined;
 
   return prisma.auditLog.create({
     data: {
       action,
-
       userId: userId ?? null,
       userEmail: userEmail ?? null,
-
-      entityType: entityType ?? tableName ?? null,
-      entityId:
-        entityId != null
-          ? String(entityId)
-          : recordId != null
-          ? String(recordId)
-          : null,
-
+      entityType: resolvedEntityType,
+      entityId: resolvedEntityId,
       method: method ?? null,
       path: path ?? null,
       ipAddress: ipAddress ?? null,
-
-      metadata: {
-        ...(metadata ?? {}),
-        beforeData,
-        afterData,
-        reason,
-      },
+      metadata: resolvedMetadata,
     },
   });
 }

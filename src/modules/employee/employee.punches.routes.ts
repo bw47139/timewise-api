@@ -1,3 +1,4 @@
+// src/modules/employee/employee.punches.routes.ts
 // UPDATED FULL FILE WITH PAY PERIOD LOCK ENFORCEMENT
 
 import { Router, Request, Response } from "express";
@@ -11,8 +12,8 @@ const router = Router();
    Helper Functions
 --------------------------------------------------------- */
 
-function parseDateOnly(value?: string | string[]) {
-  if (!value || typeof value !== "string") return null;
+function parseDateOnly(value?: string) {
+  if (!value) return null;
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
@@ -54,7 +55,10 @@ function getWeekStart(dateStr: string, weekStartDay: number) {
 }
 
 function computeDailyBuckets(total: number, cfg: any) {
-  let reg = total, ot = 0, dt = 0;
+  let reg = total,
+    ot = 0,
+    dt = 0;
+
   if (!cfg.overtimeDailyEnabled) return { reg, ot, dt };
 
   const t1 = cfg.overtimeDailyThresholdHours ?? 8;
@@ -92,10 +96,12 @@ function buildDayPairs(punches: any[]) {
 
   while (i < sorted.length) {
     const cur = sorted[i];
+
     if (upper(cur.type) === "IN") {
-      const out = sorted[i + 1] && upper(sorted[i + 1].type) === "OUT"
-        ? sorted[i + 1]
-        : null;
+      const out =
+        sorted[i + 1] && upper(sorted[i + 1].type) === "OUT"
+          ? sorted[i + 1]
+          : null;
 
       if (out) {
         totalHours +=
@@ -135,8 +141,10 @@ router.get("/:id/punches", verifyToken, async (req, res) => {
   try {
     const orgId = (req as any).user?.organizationId;
     const employeeId = Number(req.params.id);
-    if (!orgId || isNaN(employeeId))
+
+    if (!orgId || isNaN(employeeId)) {
       return res.status(400).json({ error: "Invalid request" });
+    }
 
     const punches = await prisma.punch.findMany({
       where: { employeeId },
@@ -144,7 +152,7 @@ router.get("/:id/punches", verifyToken, async (req, res) => {
     });
 
     res.json(punches);
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: "Failed to load punches" });
   }
 });
@@ -157,23 +165,38 @@ router.get("/:id/timecard", verifyToken, async (req, res) => {
   try {
     const orgId = (req as any).user?.organizationId;
     const employeeId = Number(req.params.id);
-    if (!orgId || isNaN(employeeId))
+
+    if (!orgId || isNaN(employeeId)) {
       return res.status(400).json({ error: "Invalid request" });
+    }
 
     const employee = await getEmployeeWithLocation(orgId, employeeId);
-    if (!employee)
+    if (!employee) {
       return res.status(404).json({ error: "Employee not found" });
+    }
+
+    // ✅ SAFE query param narrowing (ParsedQs fix)
+    const startDateParam =
+      typeof req.query.startDate === "string"
+        ? req.query.startDate
+        : undefined;
+
+    const endDateParam =
+      typeof req.query.endDate === "string"
+        ? req.query.endDate
+        : undefined;
 
     const startStr =
-      parseDateOnly(req.query.startDate) ??
+      parseDateOnly(startDateParam) ??
       addDays(formatDateOnly(new Date()), -13);
+
     const endStr =
-      parseDateOnly(req.query.endDate) ?? formatDateOnly(new Date());
+      parseDateOnly(endDateParam) ?? formatDateOnly(new Date());
 
     const locked = await isDateLockedForOrg(
       employee.organizationId,
       employee.locationId,
-      new Date(`${startStr}T12:00:00`)
+      new Date(`${startStr}T12:00:00Z`)
     );
 
     const punches = await prisma.punch.findMany({
@@ -196,7 +219,7 @@ router.get("/:id/timecard", verifyToken, async (req, res) => {
       weekStartDay: employee.location?.weekStartDay ?? 1,
     };
 
-    const dayMap: any = {};
+    const dayMap: Record<string, any[]> = {};
     for (const p of punches) {
       const d = formatDateOnly(p.timestamp);
       (dayMap[d] ||= []).push(p);
@@ -204,6 +227,7 @@ router.get("/:id/timecard", verifyToken, async (req, res) => {
 
     const days: any[] = [];
     let cursor = startStr;
+
     while (cursor <= endStr) {
       const { pairs, totalHours } = buildDayPairs(dayMap[cursor] ?? []);
       const b = computeDailyBuckets(totalHours, cfg);

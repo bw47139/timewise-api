@@ -4,6 +4,8 @@ import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 
 import { verifyToken } from "../../middleware/verifyToken";
+import { createAuditLog } from "../audit/audit.service";
+import { AuditActions } from "../audit/audit.actions";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -42,13 +44,23 @@ router.post("/add", verifyToken, async (req: Request, res: Response) => {
       },
     });
 
-    // Optional: Write to audit log
-    await prisma.auditLog.create({
-      data: {
-        action: "CREATE_PUNCH",
-        tableName: "Punch",
-        recordId: punch.id,
-        afterData: punch,
+    /**
+     * ✅ Typed audit log (SAFE)
+     */
+    await createAuditLog({
+      action: AuditActions.CREATE_PUNCH,
+      entityType: "Punch",
+      entityId: punch.id,
+
+      userId: (req as any).user?.id ?? null,
+      userEmail: (req as any).user?.email ?? null,
+
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+
+      metadata: {
+        punch,
       },
     });
 
@@ -77,12 +89,22 @@ router.delete("/:id", verifyToken, async (req: Request, res: Response) => {
 
     await prisma.punch.delete({ where: { id } });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: "DELETE_PUNCH",
-        tableName: "Punch",
-        recordId: id,
+    /**
+     * ✅ Typed audit log (SAFE)
+     */
+    await createAuditLog({
+      action: AuditActions.DELETE_PUNCH,
+      entityType: "Punch",
+      entityId: id,
+
+      userId: (req as any).user?.id ?? null,
+      userEmail: (req as any).user?.email ?? null,
+
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+
+      metadata: {
         beforeData: existing,
       },
     });

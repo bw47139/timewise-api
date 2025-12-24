@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 import employeeRoutes from "./employee.routes";
 import employeeStatusRoutes from "./employee.status.routes";

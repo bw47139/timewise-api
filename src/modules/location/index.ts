@@ -1,5 +1,5 @@
 // src/modules/location/index.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 import baseRoutes from "./location.routes";
 import detailRoutes from "./location.detail.routes";

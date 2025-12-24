@@ -1,5 +1,5 @@
 // src/modules/organization/overtime.routes.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 import { overtimeController } from "./overtime.controller";
 

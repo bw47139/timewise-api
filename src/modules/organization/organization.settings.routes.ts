@@ -1,5 +1,5 @@
 // src/modules/organization/organization.settings.routes.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 import { organizationSettingsController } from "./organization.settings.controller";
 

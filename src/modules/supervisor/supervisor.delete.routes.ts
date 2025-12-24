@@ -14,15 +14,17 @@ router.delete("/punch/:id", async (req: Request, res: Response) => {
     const punchId = Number(req.params.id);
     const { supervisorId, reason } = req.body;
 
-    if (!reason)
+    if (!reason) {
       return res.status(400).json({ error: "reason is required" });
+    }
 
     const punch = await prisma.punch.findUnique({
       where: { id: punchId }
     });
 
-    if (!punch)
+    if (!punch) {
       return res.status(404).json({ error: "Punch not found" });
+    }
 
     // Save before-data for audit
     const beforeData = { ...punch };
@@ -33,10 +35,9 @@ router.delete("/punch/:id", async (req: Request, res: Response) => {
 
     await createAuditLog({
       action: "DELETE_PUNCH",
-      tableName: "Punch",
-      recordId: punchId,
+      entityId:punchId,
       beforeData,
-      supervisorId,
+      userId: supervisorId ?? null, // ✅ FIXED
       reason
     });
 

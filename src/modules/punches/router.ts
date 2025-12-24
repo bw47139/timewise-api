@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import punchEmployeeRoutes from "./punch.employee.routes";
 import punchRoutes from "./punch.routes";
 

@@ -1,5 +1,5 @@
 // src/modules/timecard/router.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 import { verifyToken } from "../../middleware/verifyToken";
 

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 
-import { computePayPeriod } from "../payperiod/payPeriod.service";
+import { computePayPeriod } from "../payperiod/payperiod.service";
 
 const router = Router();
 const prisma = new PrismaClient();

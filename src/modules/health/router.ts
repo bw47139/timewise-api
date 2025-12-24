@@ -1,6 +1,6 @@
 // src/modules/health/router.ts
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import healthRouter from "./health.routes"; // ✅ FIXED: default import
 
 export const healthModuleRouter = Router();

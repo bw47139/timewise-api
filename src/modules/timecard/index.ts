@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import summaryRoutes from "./timecard.summary.routes";
 import detailRoutes from "./timecard.detail.routes";
 import timecardRoutes from "./timecard.routes";
@@ -38,6 +38,6 @@ router.use("/", timecardRoutes);
  * ------------------------------------------------------
  */
 export * from "./timecard.service";
-export * from "./payPeriod.service";
+export * from "./payperiod.service";
 
 export default router;

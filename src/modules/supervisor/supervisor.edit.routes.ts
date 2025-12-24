@@ -6,20 +6,27 @@ import { createAuditLog } from "../audit/audit.service";
 const router = Router();
 const prisma = new PrismaClient();
 
+/**
+ * Supervisor Edit Punch
+ */
 router.put("/punch/:id", async (req: Request, res: Response) => {
   try {
     const punchId = Number(req.params.id);
     const { timestamp, type, locationId, supervisorId, reason } = req.body;
 
-    if (!reason)
-      return res.status(400).json({ error: "reason is required for supervisor override" });
+    if (!reason) {
+      return res.status(400).json({
+        error: "reason is required for supervisor override"
+      });
+    }
 
     const punch = await prisma.punch.findUnique({
       where: { id: punchId }
     });
 
-    if (!punch)
+    if (!punch) {
       return res.status(404).json({ error: "Punch not found" });
+    }
 
     // SAVE OLD DATA FOR AUDIT LOG
     const beforeData = { ...punch };
@@ -41,11 +48,10 @@ router.put("/punch/:id", async (req: Request, res: Response) => {
 
     await createAuditLog({
       action: "EDIT_PUNCH",
-      tableName: "Punch",
-      recordId: punchId,
+      entityId: punchId,
       beforeData,
       afterData,
-      supervisorId,
+      userId: supervisorId ?? null, // ✅ FIXED
       reason
     });
 

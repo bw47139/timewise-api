@@ -1,6 +1,6 @@
 // src/modules/payrate/payrate.routes.ts
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { verifyToken } from "../../middleware/verifyToken";
 

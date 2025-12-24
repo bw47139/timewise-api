@@ -1,5 +1,5 @@
 // src/modules/benefits/router.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 export const benefitsModuleRouter = Router();
 

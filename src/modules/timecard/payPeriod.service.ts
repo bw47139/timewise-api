@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   getPayPeriodRange,
   PayPeriodType,
-} from "../../utils/payPeriodEngine";
+} from "../../utils/payperiod.engine";
 
 const prisma = new PrismaClient();
 

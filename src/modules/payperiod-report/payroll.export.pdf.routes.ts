@@ -1,4 +1,6 @@
-import { Router } from "express";
+// src/modules/payperiod-report/payroll.export.pdf.routes.ts
+
+import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { verifyToken } from "../../middleware/verifyToken";
 import PDFDocument from "pdfkit";
@@ -15,7 +17,7 @@ const router = Router();
 router.get(
   "/export/pdf",
   verifyToken,
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     try {
       const payPeriodId = Number(req.query.payPeriodId);
 

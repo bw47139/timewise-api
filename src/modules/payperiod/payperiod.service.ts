@@ -1,7 +1,6 @@
-// src/modules/payperiod/payPeriod.service.ts
+// src/modules/payperiod/payperiod.service.ts
 
-import { PayPeriodType } from "../../utils/payPeriodEngine";
-import { PayPeriodRange, OrganizationLike } from "./payPeriod.types";
+import { PayPeriodRange, OrganizationLike } from "./payperiod.types";
 
 /**
  * -----------------------------------------------------
@@ -98,7 +97,7 @@ function monthly(
 
 /**
  * -----------------------------------------------------
- * Compute pay period (enum-safe)
+ * Compute pay period (string-union safe)
  * -----------------------------------------------------
  */
 export function computePayPeriod(
@@ -106,16 +105,16 @@ export function computePayPeriod(
   refDate: Date
 ): PayPeriodRange {
   switch (org.payPeriodType) {
-    case PayPeriodType.WEEKLY:
+    case "WEEKLY":
       return weekly(org, refDate);
 
-    case PayPeriodType.BIWEEKLY:
+    case "BIWEEKLY":
       return biweekly(org, refDate);
 
-    case PayPeriodType.SEMIMONTHLY:
+    case "SEMIMONTHLY":
       return semiMonthly(org, refDate);
 
-    case PayPeriodType.MONTHLY:
+    case "MONTHLY":
       return monthly(org, refDate);
 
     default:

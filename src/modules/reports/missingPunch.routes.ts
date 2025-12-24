@@ -51,7 +51,9 @@ router.get("/missing-punches", async (req: Request, res: Response) => {
           });
         }
 
-        lastType = punch.type;
+        lastType = punch.type === "IN" || punch.type === "OUT"
+  ? punch.type
+  : null;
       }
 
       // END OF DAY CHECK (IN without OUT)

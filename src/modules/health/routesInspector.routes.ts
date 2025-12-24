@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import type { Express } from "express";
 
 import { getLiveRoutes } from "../../utils/routeInspector";

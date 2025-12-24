@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { verifyToken } from "../../middleware/verifyToken";
-import payPeriodRoutes from "./payPeriod.routes";
+import payPeriodRoutes from "./payperiod.routes";
 
 const router = Router();
 

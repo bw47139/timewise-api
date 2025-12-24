@@ -1,0 +1,46 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const client_1 = require("@prisma/client");
+const verifyToken_1 = require("../../middleware/verifyToken");
+const prisma = new client_1.PrismaClient();
+const router = (0, express_1.Router)();
+/**
+ * -------------------------------------------------
+ * GET /api/payperiod-report/payroll/export/csv
+ * Query: payPeriodId
+ * -------------------------------------------------
+ */
+router.get("/export/csv", verifyToken_1.verifyToken, async (req, res) => {
+    try {
+        const payPeriodId = Number(req.query.payPeriodId);
+        const { organizationId } = req.auth;
+        if (!payPeriodId) {
+            return res.status(400).send("payPeriodId required");
+        }
+        const snapshot = await prisma.payrollSnapshot.findUnique({
+            where: {
+                organizationId_payPeriodId: {
+                    organizationId,
+                    payPeriodId,
+                },
+            },
+        });
+        if (!snapshot) {
+            return res.status(404).send("Payroll not locked");
+        }
+        const data = snapshot.snapshotData;
+        let csv = "Employee,Regular Hours,OT Hours,DT Hours,PTO Hours,Rate,Gross Pay\n";
+        for (const e of data.employees) {
+            csv += `"${e.name}",${e.regularHours},${e.overtimeHours},${e.doubletimeHours ?? 0},${e.ptoHours ?? 0},${e.rate},${e.grossPay}\n`;
+        }
+        res.setHeader("Content-Disposition", `attachment; filename=payroll-${payPeriodId}.csv`);
+        res.setHeader("Content-Type", "text/csv");
+        res.send(csv);
+    }
+    catch (err) {
+        console.error("❌ CSV export failed", err);
+        res.status(500).send("CSV export failed");
+    }
+});
+exports.default = router;

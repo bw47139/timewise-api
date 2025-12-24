@@ -1,6 +1,6 @@
 // src/modules/organization/organization.service.ts
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, PayPeriodType } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -20,7 +20,7 @@ export type CreateOrganizationData = {
 
 export type UpdateOrganizationData = Partial<CreateOrganizationData> & {
   // Pay period CONFIG ONLY (stored fields only)
-  payPeriodType?: string;
+  payPeriodType?: PayPeriodType;
   weekStartDay?: number;
   biweeklyAnchorDate?: Date | null;
 
@@ -90,9 +90,13 @@ export function updateOrganization(
   id: number,
   data: UpdateOrganizationData
 ) {
+  const updateData = stripUndefined({
+    ...data,
+  });
+
   return prisma.organization.update({
     where: { id },
-    data: stripUndefined(data),
+    data: updateData,
   });
 }
 

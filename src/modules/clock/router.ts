@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 import clockFaceRouter from "./clock.face.routes";
 import clockPinRouter from "./clock.pin.routes";

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import punchesRouter from "./router";
 import { verifyToken } from "../../middleware/verifyToken";
 

@@ -1,11 +1,6 @@
-// src/modules/payperiod-report/payPeriodReport.routes.ts
-
 import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import {
-  getPayPeriodConfig,
-  getPayPeriodForDate,
-} from "../timecard/payPeriod.service";
+import { getPayPeriodForDate } from "../timecard/payperiod.service";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -20,9 +15,9 @@ router.get("/", async (req: Request, res: Response) => {
     const { date } = req.query;
 
     if (!date) {
-      return res
-        .status(400)
-        .json({ error: "date query param is required (YYYY-MM-DD)" });
+      return res.status(400).json({
+        error: "date query param is required (YYYY-MM-DD)",
+      });
     }
 
     const refDate = new Date(String(date));
@@ -31,18 +26,23 @@ router.get("/", async (req: Request, res: Response) => {
     }
 
     // TEMP: single-tenant (first org)
-    const org = await prisma.organization.findFirst();
+    const org = await prisma.organization.findFirst({
+      select: { id: true },
+    });
+
     if (!org) {
       return res.status(404).json({ error: "Organization not found" });
     }
 
-    const config = await getPayPeriodConfig(org.id);
-
-    const payPeriod = getPayPeriodForDate(refDate, config);
+    // ✅ CORRECT CALL SIGNATURE
+    const payPeriod = await getPayPeriodForDate(
+      org.id,
+      refDate
+    );
 
     return res.json(payPeriod);
   } catch (err: any) {
-    console.error("Pay period report error:", err.message);
+    console.error("Pay period report error:", err);
     return res
       .status(500)
       .json({ error: "Failed to resolve pay period" });

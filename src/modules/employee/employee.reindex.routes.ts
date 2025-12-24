@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { IndexFacesCommand } from "@aws-sdk/client-rekognition";
 

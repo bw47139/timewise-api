@@ -18,6 +18,8 @@ export async function getPayPeriodConfig(
   payPeriodType: PayPeriodType;
   weekStartDay: number;
   biweeklyAnchorDate: Date | null;
+
+  // Engine-only fields (not stored in Prisma)
   semiMonthCut1: null;
   semiMonthCut2: null;
   monthlyCutDay: null;
@@ -51,7 +53,7 @@ export async function getPayPeriodConfig(
 
 /**
  * ------------------------------------------------------
- * Resolve pay period range for a date
+ * Resolve pay period range for a given date
  * ------------------------------------------------------
  */
 export async function getPayPeriodForDate(
@@ -70,7 +72,7 @@ export async function getPayPeriodForDate(
       weekStartDay: config.weekStartDay,
       biWeeklyAnchorDate: config.biweeklyAnchorDate,
 
-      // engine-safe optional fields
+      // Engine-safe optional fields
       semiMonthCut1: null,
       semiMonthCut2: null,
       monthlyCutDay: null,
@@ -87,6 +89,8 @@ export async function getPayPeriodForDate(
 }
 
 /**
- * Re-export enum
+ * ------------------------------------------------------
+ * Re-export enum for barrel consumers
+ * ------------------------------------------------------
  */
 export type { PayPeriodType };

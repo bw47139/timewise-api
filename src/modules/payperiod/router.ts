@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { verifyToken } from "../../middleware/verifyToken";
 import payPeriodRoutes from "./payPeriod.routes";
 

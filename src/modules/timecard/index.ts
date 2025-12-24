@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import summaryRoutes from "./timecard.summary.routes";
 import detailRoutes from "./timecard.detail.routes";
 import timecardRoutes from "./timecard.routes";
@@ -28,16 +28,15 @@ router.use("/", timecardRoutes);
 
 /**
  * ------------------------------------------------------
- * Barrel Exports (IMPORTANT)
+ * Barrel Exports (CRITICAL)
  * ------------------------------------------------------
- * These allow other modules to safely import business
- * logic without reaching into internal files.
- *
- * Example:
- *   import { getTimecardForRange } from "../timecard";
+ * These are consumed by:
+ * - payperiod-report
+ * - payroll
+ * - timecard
  * ------------------------------------------------------
  */
 export * from "./timecard.service";
-export * from "./payperiod.service";
+export * from "./payPeriod.service"; // ⚠️ CASE-SENSITIVE (PayPeriod)
 
 export default router;

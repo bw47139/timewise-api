@@ -8,7 +8,8 @@ const prisma = new PrismaClient();
 
 /**
  * ------------------------------------------------------
- * Load pay-period configuration from ACTIVE payrollPeriod
+ * Load pay-period configuration
+ * (ONLY fields that exist in Prisma)
  * ------------------------------------------------------
  */
 export async function getPayPeriodConfig(
@@ -17,12 +18,11 @@ export async function getPayPeriodConfig(
   payPeriodType: PayPeriodType;
   weekStartDay: number;
   biweeklyAnchorDate: Date | null;
-  semiMonthCut1: number | null;
-  semiMonthCut2: number | null;
-  monthlyCutDay: number | null;
-  cutoffTime: string | null;
+  semiMonthCut1: null;
+  semiMonthCut2: null;
+  monthlyCutDay: null;
+  cutoffTime: null;
 }> {
-  // 1️⃣ Load organization-level config
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: {
@@ -36,27 +36,16 @@ export async function getPayPeriodConfig(
     throw new Error("Organization pay period config missing");
   }
 
-  // 2️⃣ Load ACTIVE payroll period
-  const period = await prisma.payrollPeriod.findFirst({
-    where: {
-      organizationId,
-      status: "OPEN",
-    },
-    orderBy: { startDate: "desc" },
-  });
-
-  if (!period) {
-    throw new Error("No active payroll period found");
-  }
-
   return {
     payPeriodType: org.payPeriodType as PayPeriodType,
     weekStartDay: org.weekStartDay ?? 1,
     biweeklyAnchorDate: org.biweeklyAnchorDate ?? null,
-    semiMonthCut1: period.semiMonthCut1 ?? null,
-    semiMonthCut2: period.semiMonthCut2 ?? null,
-    monthlyCutDay: period.monthlyCutDay ?? null,
-    cutoffTime: period.cutoffTime ?? null,
+
+    // 🚨 NOT IN PRISMA — MUST BE NULL
+    semiMonthCut1: null,
+    semiMonthCut2: null,
+    monthlyCutDay: null,
+    cutoffTime: null,
   };
 }
 
@@ -80,10 +69,12 @@ export async function getPayPeriodForDate(
       payPeriodType: config.payPeriodType,
       weekStartDay: config.weekStartDay,
       biWeeklyAnchorDate: config.biweeklyAnchorDate,
-      semiMonthCut1: config.semiMonthCut1,
-      semiMonthCut2: config.semiMonthCut2,
-      monthlyCutDay: config.monthlyCutDay,
-      cutoffTime: config.cutoffTime,
+
+      // engine-safe optional fields
+      semiMonthCut1: null,
+      semiMonthCut2: null,
+      monthlyCutDay: null,
+      cutoffTime: null,
     },
     date
   );

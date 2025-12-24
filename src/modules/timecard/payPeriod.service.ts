@@ -10,11 +10,14 @@ const prisma = new PrismaClient();
 
 /**
  * ------------------------------------------------------
- * Get organization pay period configuration
- * (engine-safe, enum-safe)
+ * Get pay period configuration for an organization + date
+ * (schema-safe, engine-safe)
  * ------------------------------------------------------
  */
-export async function getPayPeriodConfig(orgId: number): Promise<{
+export async function getPayPeriodConfig(
+  organizationId: number,
+  date: Date
+): Promise<{
   payPeriodType: PayPeriodType;
   weekStartDay: number;
   biWeeklyAnchorDate: Date | null;
@@ -23,31 +26,62 @@ export async function getPayPeriodConfig(orgId: number): Promise<{
   monthlyCutDay: number | null;
   cutoffTime: string | null;
 }> {
+  // --------------------------------------------------
+  // Load organization (ONLY fields that exist)
+  // --------------------------------------------------
   const org = await prisma.organization.findUnique({
-    where: { id: orgId },
+    where: { id: organizationId },
     select: {
-      payPeriodType: true,
+      id: true,
       weekStartDay: true,
-      biWeeklyAnchorDate: true,
-      semiMonthCut1: true,
-      semiMonthCut2: true,
-      monthlyCutDay: true,
-      cutoffTime: true,
+      timezone: true,
     },
   });
 
-  if (!org || !org.payPeriodType) {
-    throw new Error("Organization pay period configuration not found.");
+  if (!org) {
+    throw new Error("Organization not found");
   }
 
+  // --------------------------------------------------
+  // Load payroll period covering the date
+  // --------------------------------------------------
+  const period = await prisma.payrollPeriod.findFirst({
+    where: {
+      organizationId,
+      startDate: { lte: date },
+      endDate: { gte: date },
+    },
+  });
+
+  if (!period) {
+    throw new Error("No payroll period found for date");
+  }
+
+  // --------------------------------------------------
+  // Normalize config for payPeriodEngine
+  // --------------------------------------------------
   return {
-    payPeriodType: org.payPeriodType as PayPeriodType,
-    weekStartDay: org.weekStartDay ?? 1,
-    biWeeklyAnchorDate: org.biWeeklyAnchorDate ?? null,
-    semiMonthCut1: org.semiMonthCut1 ?? null,
-    semiMonthCut2: org.semiMonthCut2 ?? null,
-    monthlyCutDay: org.monthlyCutDay ?? null,
-    cutoffTime: org.cutoffTime ?? null,
+    payPeriodType: period.type as PayPeriodType,
+
+    weekStartDay:
+      period.weekStartDay ??
+      org.weekStartDay ??
+      1,
+
+    biWeeklyAnchorDate:
+      period.biWeeklyAnchorDate ?? null,
+
+    semiMonthCut1:
+      period.semiMonthCut1 ?? null,
+
+    semiMonthCut2:
+      period.semiMonthCut2 ?? null,
+
+    monthlyCutDay:
+      period.monthlyCutDay ?? null,
+
+    cutoffTime:
+      period.cutoffTime ?? null,
   };
 }
 

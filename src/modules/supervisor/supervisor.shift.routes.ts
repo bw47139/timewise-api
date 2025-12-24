@@ -21,28 +21,40 @@ router.post("/shift", async (req: Request, res: Response) => {
       reason
     } = req.body;
 
-    if (!employeeId || !locationId || !startTime || !endTime)
+    if (!employeeId || !locationId || !startTime || !endTime) {
       return res.status(400).json({
         error: "employeeId, locationId, startTime and endTime are required"
       });
+    }
 
-    if (!reason)
+    if (!supervisorId) {
+      return res.status(400).json({
+        error: "supervisorId is required"
+      });
+    }
+
+    if (!reason) {
       return res.status(400).json({
         error: "reason is required for supervisor override"
       });
+    }
 
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId }
     });
 
-    if (!employee)
+    if (!employee) {
       return res.status(404).json({ error: "Employee not found" });
+    }
 
     const start = new Date(startTime);
     const end = new Date(endTime);
 
-    if (end <= start)
-      return res.status(400).json({ error: "endTime must be after startTime" });
+    if (end <= start) {
+      return res.status(400).json({
+        error: "endTime must be after startTime"
+      });
+    }
 
     // CREATE IN PUNCH
     const punchIn = await prisma.punch.create({
@@ -52,7 +64,7 @@ router.post("/shift", async (req: Request, res: Response) => {
         type: "IN",
         timestamp: start,
         isSupervisorOverride: true,
-        overrideByUserId: supervisorId ?? null,
+        overrideByUserId: supervisorId,
         overrideReason: reason
       }
     });
@@ -65,28 +77,32 @@ router.post("/shift", async (req: Request, res: Response) => {
         type: "OUT",
         timestamp: end,
         isSupervisorOverride: true,
-        overrideByUserId: supervisorId ?? null,
+        overrideByUserId: supervisorId,
         overrideReason: reason
       }
     });
 
-    // AUDIT LOGS
+    // AUDIT LOGS (✅ userId, NOT supervisorId)
     await createAuditLog({
       action: "CREATE_SHIFT_IN",
       tableName: "Punch",
       recordId: punchIn.id,
+      userId: supervisorId,
       afterData: punchIn,
-      supervisorId,
-      reason
+      metadata: {
+        reason
+      }
     });
 
     await createAuditLog({
       action: "CREATE_SHIFT_OUT",
       tableName: "Punch",
       recordId: punchOut.id,
+      userId: supervisorId,
       afterData: punchOut,
-      supervisorId,
-      reason
+      metadata: {
+        reason
+      }
     });
 
     res.json({
@@ -96,10 +112,11 @@ router.post("/shift", async (req: Request, res: Response) => {
         out: punchOut
       }
     });
-
   } catch (error) {
     console.error("Supervisor shift creation error:", error);
-    res.status(500).json({ error: "Failed to create manual shift" });
+    res.status(500).json({
+      error: "Failed to create manual shift"
+    });
   }
 });
 

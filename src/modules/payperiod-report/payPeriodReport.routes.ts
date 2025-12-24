@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { getPayPeriodForDate } from "../timecard/payperiod.service";
+
+// ✅ FIX: import from timecard barrel, not deep file
+import { getPayPeriodForDate } from "../timecard";
 
 const prisma = new PrismaClient();
 const router = Router();

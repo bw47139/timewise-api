@@ -1,5 +1,3 @@
-// src/modules/timecard/payPeriod.service.ts
-
 import { PrismaClient } from "@prisma/client";
 import {
   getPayPeriodRange,
@@ -10,111 +8,71 @@ const prisma = new PrismaClient();
 
 /**
  * ------------------------------------------------------
- * Get pay period configuration for an organization + date
- * (schema-safe, engine-safe)
+ * Get ORGANIZATION pay period configuration
+ * (schema-accurate, Prisma-safe)
  * ------------------------------------------------------
  */
-export async function getPayPeriodConfig(
-  organizationId: number,
-  date: Date
-): Promise<{
+export async function getPayPeriodConfig(orgId: number): Promise<{
   payPeriodType: PayPeriodType;
   weekStartDay: number;
-  biWeeklyAnchorDate: Date | null;
+  biweeklyAnchorDate: Date | null;
   semiMonthCut1: number | null;
   semiMonthCut2: number | null;
   monthlyCutDay: number | null;
   cutoffTime: string | null;
 }> {
-  // --------------------------------------------------
-  // Load organization (ONLY fields that exist)
-  // --------------------------------------------------
   const org = await prisma.organization.findUnique({
-    where: { id: organizationId },
+    where: { id: orgId },
     select: {
-      id: true,
+      payPeriodType: true,
       weekStartDay: true,
-      timezone: true,
+      biweeklyAnchorDate: true, // ✅ CORRECT FIELD NAME
+      semiMonthCut1: true,
+      semiMonthCut2: true,
+      monthlyCutDay: true,
+      cutoffTime: true,
     },
   });
 
-  if (!org) {
-    throw new Error("Organization not found");
+  if (!org || !org.payPeriodType) {
+    throw new Error("Organization pay period configuration not found.");
   }
 
-  // --------------------------------------------------
-  // Load payroll period covering the date
-  // --------------------------------------------------
-  const period = await prisma.payrollPeriod.findFirst({
-    where: {
-      organizationId,
-      startDate: { lte: date },
-      endDate: { gte: date },
-    },
-  });
-
-  if (!period) {
-    throw new Error("No payroll period found for date");
-  }
-
-  // --------------------------------------------------
-  // Normalize config for payPeriodEngine
-  // --------------------------------------------------
   return {
-    payPeriodType: period.type as PayPeriodType,
-
-    weekStartDay:
-      period.weekStartDay ??
-      org.weekStartDay ??
-      1,
-
-    biWeeklyAnchorDate:
-      period.biWeeklyAnchorDate ?? null,
-
-    semiMonthCut1:
-      period.semiMonthCut1 ?? null,
-
-    semiMonthCut2:
-      period.semiMonthCut2 ?? null,
-
-    monthlyCutDay:
-      period.monthlyCutDay ?? null,
-
-    cutoffTime:
-      period.cutoffTime ?? null,
+    payPeriodType: org.payPeriodType as PayPeriodType,
+    weekStartDay: org.weekStartDay ?? 1,
+    biweeklyAnchorDate: org.biweeklyAnchorDate ?? null,
+    semiMonthCut1: org.semiMonthCut1 ?? null,
+    semiMonthCut2: org.semiMonthCut2 ?? null,
+    monthlyCutDay: org.monthlyCutDay ?? null,
+    cutoffTime: org.cutoffTime ?? null,
   };
 }
 
 /**
  * ------------------------------------------------------
- * PUBLIC API — resolve pay period range for a date
+ * Resolve pay period RANGE for a date
  * ------------------------------------------------------
  */
-export function getPayPeriodForDate(
-  date: Date,
-  config: {
-    payPeriodType: PayPeriodType;
-    weekStartDay?: number;
-    biWeeklyAnchorDate?: Date | null;
-    semiMonthCut1?: number | null;
-    semiMonthCut2?: number | null;
-    monthlyCutDay?: number | null;
-    cutoffTime?: string | null;
-  }
-): {
+export async function getPayPeriodForDate(
+  organizationId: number,
+  date: Date
+): Promise<{
   type: PayPeriodType;
   start: string;
   end: string;
-} {
+}> {
+  const config = await getPayPeriodConfig(organizationId);
+
   const period = getPayPeriodRange(
     {
       payPeriodType: config.payPeriodType,
       weekStartDay: config.weekStartDay,
-      biWeeklyAnchorDate: config.biWeeklyAnchorDate ?? null,
-      semiMonthCut1: config.semiMonthCut1 ?? null,
-      semiMonthCut2: config.semiMonthCut2 ?? null,
-      monthlyCutDay: config.monthlyCutDay ?? null,
-      cutoffTime: config.cutoffTime ?? null,
+      biWeeklyAnchorDate: config.biweeklyAnchorDate, // engine expects camelCase
+      semiMonthCut1: config.semiMonthCut1,
+      semiMonthCut2: config.semiMonthCut2,
+      monthlyCutDay: config.monthlyCutDay,
+      cutoffTime: config.cutoffTime,
     },
     date
   );
@@ -127,6 +85,6 @@ export function getPayPeriodForDate(
 }
 
 /**
- * Re-export enum for downstream consumers
+ * Re-export enum
  */
 export type { PayPeriodType };

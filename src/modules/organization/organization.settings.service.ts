@@ -1,37 +1,65 @@
-// src/modules/organization/organization.settings.service.ts
-import { prisma } from "../../prisma";
+import { PrismaClient } from "@prisma/client";
 
-export const organizationSettingsService = {
-  async getProfile(organizationId: number) {
-    return prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        address: true,
-        city: true,
-        state: true,
-        zipcode: true,
-        logoUrl: true,
-      },
-    });
-  },
+const prisma = new PrismaClient();
 
-  async updateProfile(organizationId: number, data: any) {
-    const allowed = {
-      name: data.name,
-      phone: data.phone,
-      address: data.address,
-      city: data.city,
-      state: data.state,
-      zipcode: data.zipcode,
-      logoUrl: data.logoUrl,
-    };
+/* ---------------------------------------------
+   ORGANIZATION SETTINGS (READ)
+--------------------------------------------- */
 
-    return prisma.organization.update({
-      where: { id: organizationId },
-      data: allowed,
-    });
-  },
-};
+export function getOrganizationSettings(id: number) {
+  return prisma.organization.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      timezone: true,
+
+      // --------------------
+      // Contact / Address
+      // --------------------
+      phone: true,
+      addressLine1: true,
+      addressLine2: true,
+      city: true,
+      state: true,
+      postalCode: true,
+      country: true,
+
+      // --------------------
+      // Pay Period Settings
+      // --------------------
+      payPeriodType: true,
+      weekStartDay: true,
+      biweeklyAnchorDate: true,
+      cutoffTime: true,
+
+      // --------------------
+      // Auto Lunch Rules
+      // --------------------
+      autoLunchEnabled: true,
+      autoLunchMinutes: true,
+      autoLunchMinimumShift: true,
+      autoLunchDeductOnce: true,
+      autoLunchIgnoreIfBreak: true,
+
+      // --------------------
+      // Overtime Rules
+      // --------------------
+      overtimeDailyEnabled: true,
+      overtimeDailyThresholdHours: true,
+      overtimeWeeklyEnabled: true,
+      overtimeWeeklyThresholdHours: true,
+      doubleTimeEnabled: true,
+      doubletimeDailyThresholdHours: true,
+
+      // --------------------
+      // PTO Rules
+      // --------------------
+      ptoEnabled: true,
+      accrualRatePerPeriod: true,
+      maxPtoBalance: true,
+      carryoverEnabled: true,
+      carryoverLimit: true,
+    },
+  });
+}

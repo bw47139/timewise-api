@@ -1,5 +1,3 @@
-// src/modules/organization/organization.service.ts
-
 import { PrismaClient, PayPeriodType } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -11,39 +9,54 @@ const prisma = new PrismaClient();
 export type CreateOrganizationData = {
   name: string; // REQUIRED
   timezone?: string;
+
   phone?: string | null;
-  address?: string | null;
+
+  // ✅ Address fields (schema-correct)
+  addressLine1?: string | null;
+  addressLine2?: string | null;
   city?: string | null;
   state?: string | null;
-  zipcode?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
 };
 
 export type UpdateOrganizationData = Partial<CreateOrganizationData> & {
-  // Pay period CONFIG ONLY (stored fields only)
+  // --------------------
+  // Pay period config
+  // --------------------
   payPeriodType?: PayPeriodType;
   weekStartDay?: number;
   biweeklyAnchorDate?: Date | null;
+  cutoffTime?: string | null;
 
-  // Locking
-  payPeriodLockEnabled?: boolean;
-  lockAfterDays?: number;
-
-  // Overtime / Doubletime
-  overtimeDailyThresholdHours?: number;
-  overtimeWeeklyThresholdHours?: number;
-  doubletimeDailyThresholdHours?: number;
-
+  // --------------------
   // Auto-lunch
+  // --------------------
   autoLunchEnabled?: boolean;
   autoLunchMinutes?: number;
   autoLunchMinimumShift?: number;
   autoLunchDeductOnce?: boolean;
   autoLunchIgnoreIfBreak?: boolean;
 
+  // --------------------
+  // Overtime / Doubletime
+  // --------------------
+  overtimeDailyEnabled?: boolean;
+  overtimeDailyThresholdHours?: number;
+
+  overtimeWeeklyEnabled?: boolean;
+  overtimeWeeklyThresholdHours?: number;
+
+  doubleTimeEnabled?: boolean;
+  doubletimeDailyThresholdHours?: number;
+
+  // --------------------
   // PTO
-  ptoAccrualEnabled?: boolean;
-  ptoAccrualRateHoursPerHourWorked?: number;
-  ptoAccrualMaxBalanceHours?: number;
+  // --------------------
+  ptoEnabled?: boolean;
+  accrualRatePerPeriod?: number;
+  maxPtoBalance?: number;
   carryoverEnabled?: boolean;
   carryoverLimit?: number;
 };
@@ -71,11 +84,16 @@ export function createOrganization(data: CreateOrganizationData) {
     data: {
       name: data.name,
       timezone: data.timezone ?? "America/New_York",
+
       phone: data.phone ?? null,
-      address: data.address ?? null,
+
+      // ✅ Address (schema-accurate)
+      addressLine1: data.addressLine1 ?? null,
+      addressLine2: data.addressLine2 ?? null,
       city: data.city ?? null,
       state: data.state ?? null,
-      zipcode: data.zipcode ?? null,
+      postalCode: data.postalCode ?? null,
+      country: data.country ?? "USA",
     },
   });
 }
@@ -160,7 +178,7 @@ export function updateAutoLunchSettingsDB(
 }
 
 /* ---------------------------------------------
-   PAY PERIOD CONFIG (READ-ONLY, SCHEMA SAFE)
+   PAY PERIOD CONFIG (READ-ONLY)
 --------------------------------------------- */
 
 export function getPayPeriodConfig(id: number) {
@@ -170,6 +188,7 @@ export function getPayPeriodConfig(id: number) {
       payPeriodType: true,
       weekStartDay: true,
       biweeklyAnchorDate: true,
+      cutoffTime: true,
     },
   });
 }

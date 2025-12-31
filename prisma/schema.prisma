@@ -49,60 +49,91 @@ enum Gender {
 // =========================================================
 //
 model Organization {
-  id        Int      @id @default(autoincrement())
-  name      String
-  timezone  String   @default("America/New_York")
+  id       Int    @id @default(autoincrement())
+  name     String
+  timezone String @default("America/New_York")
+
+  // ✅ Org contact (used by settings/services)
+  phone String?
+
+  // ✅ Organization Address (added to match your services)
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String? @default("USA")
+
+  // ✅ Default (active) location
+  defaultLocationId Int?      @unique
+  defaultLocation   Location? @relation("OrgDefaultLocation", fields: [defaultLocationId], references: [id])
+
+  // =========================================================
+  // ORG-LEVEL PAYROLL SETTINGS (required by your code)
+  // NOTE: Locations can still override these; org fields exist
+  // so your org services/controllers compile + work.
+  // =========================================================
+
+  // --------------------
+  // Pay Period Settings
+  // --------------------
+  payPeriodType      PayPeriodType @default(WEEKLY)
+  weekStartDay       Int           @default(1) // 0=Sun .. 6=Sat
+  biweeklyAnchorDate DateTime?
+  cutoffTime         String?       @default("17:00") // "HH:mm"
+
+  // --------------------
+  // Auto Lunch Rules
+  // --------------------
+  autoLunchEnabled       Boolean @default(false)
+  autoLunchMinutes       Int     @default(30)
+  autoLunchMinimumShift  Float   @default(6.0)
+  autoLunchDeductOnce    Boolean @default(true)
+  autoLunchIgnoreIfBreak Boolean @default(false)
+
+  // --------------------
+  // Overtime Rules
+  // --------------------
+  overtimeDailyEnabled          Boolean @default(false)
+  overtimeDailyThresholdHours   Float   @default(8.0)
+
+  overtimeWeeklyEnabled         Boolean @default(true)
+  overtimeWeeklyThresholdHours  Float   @default(40.0)
+
+  doubleTimeEnabled             Boolean @default(false)
+  doubletimeDailyThresholdHours Float   @default(12.0)
+
+  // --------------------
+  // PTO Rules
+  // --------------------
+  ptoEnabled           Boolean @default(false)
+  accrualRatePerPeriod Float?
+  maxPtoBalance        Float?
+  carryoverEnabled     Boolean @default(false)
+  carryoverLimit       Float?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  phone   String?
-  address String?
-  city    String?
-  state   String?
-  zipcode String?
-  logoUrl String?
-
-  payPeriodType      PayPeriodType @default(WEEKLY)
-  weekStartDay       Int?          @default(1)
-  biweeklyAnchorDate DateTime?
-  monthlyCutDay      Int?          @default(1) // ✅ ADDED (fix for monthly pay periods)
-  cutoffTime         String?       @default("17:00")
-
-  overtimeDailyThresholdHours   Float @default(8.0)
-  overtimeWeeklyThresholdHours  Float @default(40.0)
-  doubletimeDailyThresholdHours Float @default(12.0)
-
-  overtimeDailyEnabled  Boolean @default(true)
-  overtimeWeeklyEnabled Boolean @default(true)
-  doubleTimeEnabled     Boolean @default(false)
-
-  autoLunchEnabled       Boolean @default(false)
-  autoLunchMinutes       Int     @default(30)
-  autoLunchMinimumShift  Int     @default(6)
-  autoLunchDeductOnce    Boolean @default(true)
-  autoLunchIgnoreIfBreak Boolean @default(true)
-
-  ptoEnabled           Boolean @default(false)
-  accrualRatePerPeriod Float   @default(0.0)
-  maxPtoBalance        Float   @default(0.0)
-  carryoverEnabled     Boolean @default(false)
-  carryoverLimit       Float   @default(0.0)
-
-  locations        Location[]
-  employees        Employee[]
-  users            User[]
-  payrollPeriods   PayrollPeriod[]
-  payrollSnapshots PayrollSnapshot[]
-  holidays         Holiday[]
+  // ✅ All locations for org
+  locations       Location[]        @relation("OrgLocations")
+  employees       Employee[]
+  PayrollPeriod   PayrollPeriod[]
+  PayrollSnapshot PayrollSnapshot[]
+  Holiday         Holiday[]
+  User            User[]
 }
 
 model Location {
-  id             Int      @id @default(autoincrement())
+  id             Int    @id @default(autoincrement())
   organizationId Int
   name           String
   timezone       String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   industry String?
 
@@ -130,11 +161,16 @@ model Location {
   overtimeWeeklyEnabled         Boolean @default(true)
   overtimeWeeklyThresholdHours  Float   @default(40.0)
 
-  organization   Organization    @relation(fields: [organizationId], references: [id])
+  // ✅ Relations (EXPLICIT + MATCHING)
+  organization           Organization  @relation("OrgLocations", fields: [organizationId], references: [id])
+  defaultForOrganization Organization? @relation("OrgDefaultLocation")
+
   employees      Employee[]
   punches        Punch[]
   payrollPeriods PayrollPeriod[]
   devices        Device[]
+
+  @@index([organizationId])
 }
 
 //
@@ -210,7 +246,7 @@ model Employee {
 // =========================================================
 //
 model EmergencyContact {
-  id         Int @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   employeeId Int
   name       String
   phone      String
@@ -239,7 +275,7 @@ model Punch {
 }
 
 model PayrollPeriod {
-  id             Int @id @default(autoincrement())
+  id             Int  @id @default(autoincrement())
   organizationId Int
   locationId     Int?
 
@@ -465,7 +501,7 @@ model Industry {
   updatedAt DateTime @updatedAt
 
   departments Department[]
-  jobTitles  JobTitle[]
+  jobTitles   JobTitle[]
 }
 
 model Department {
@@ -476,7 +512,7 @@ model Department {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  industry  Industry  @relation(fields: [industryId], references: [id])
+  industry  Industry   @relation(fields: [industryId], references: [id])
   jobTitles JobTitle[]
 
   @@unique([industryId, name])

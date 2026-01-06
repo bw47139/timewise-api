@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
  * ------------------------------------------------------
  * GET /api/organization
  * ------------------------------------------------------
- * Admin-only: list all organizations
+ * Admin-only: List all organizations
  * ------------------------------------------------------
  */
 router.get("/", verifyToken, async (_req: Request, res: Response) => {
@@ -29,20 +29,20 @@ router.get("/", verifyToken, async (_req: Request, res: Response) => {
  * ------------------------------------------------------
  * GET /api/organization/me
  * ------------------------------------------------------
- * Canonical endpoint used by frontend
+ * Return organization of logged-in user
+ * (CRITICAL: must come before /:id)
  * ------------------------------------------------------
  */
 router.get("/me", verifyToken, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const { organizationId } = req.user as any;
 
-    if (!user || !user.organizationId) {
-      console.error("❌ Missing organizationId on user:", user);
-      return res.status(401).json({ error: "Invalid auth context" });
+    if (!organizationId || isNaN(Number(organizationId))) {
+      return res.status(400).json({ error: "Invalid organization id" });
     }
 
     const organization = await prisma.organization.findUnique({
-      where: { id: user.organizationId },
+      where: { id: Number(organizationId) },
     });
 
     if (!organization) {
@@ -65,7 +65,7 @@ router.get("/:id", verifyToken, async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
 
-    if (Number.isNaN(id)) {
+    if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid organization id" });
     }
 

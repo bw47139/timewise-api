@@ -9,10 +9,10 @@ const prisma = new PrismaClient();
  * ------------------------------------------------------
  * GET /api/organization
  * ------------------------------------------------------
- * Admin-only: List all organizations
+ * Admin-only: list all organizations
  * ------------------------------------------------------
  */
-router.get("/", verifyToken, async (req: Request, res: Response) => {
+router.get("/", verifyToken, async (_req: Request, res: Response) => {
   try {
     const organizations = await prisma.organization.findMany({
       orderBy: { id: "asc" },
@@ -29,67 +29,24 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
  * ------------------------------------------------------
  * GET /api/organization/me
  * ------------------------------------------------------
- * CANONICAL endpoint used by frontend
+ * Canonical endpoint used by frontend
  * ------------------------------------------------------
  */
 router.get("/me", verifyToken, async (req: Request, res: Response) => {
   try {
-    const user = req.user as any;
+    const user = (req as any).user;
 
-    if (!user?.organizationId) {
-      return res.status(401).json({
-        error: "User is not linked to an organization",
-      });
+    if (!user || !user.organizationId) {
+      console.error("❌ Missing organizationId on user:", user);
+      return res.status(401).json({ error: "Invalid auth context" });
     }
 
     const organization = await prisma.organization.findUnique({
       where: { id: user.organizationId },
-      include: {
-        locations: true,
-      },
     });
 
     if (!organization) {
-      return res.status(404).json({
-        error: "Organization not found",
-      });
-    }
-
-    return res.json(organization);
-  } catch (error) {
-    console.error("❌ Failed to load organization (me):", error);
-    return res.status(500).json({ error: "Failed to load organization" });
-  }
-});
-
-/**
- * ------------------------------------------------------
- * GET /api/organization/current
- * ------------------------------------------------------
- * Legacy alias (kept for compatibility)
- * ------------------------------------------------------
- */
-router.get("/current", verifyToken, async (req: Request, res: Response) => {
-  try {
-    const user = req.user as any;
-
-    if (!user?.organizationId) {
-      return res.status(401).json({
-        error: "User is not linked to an organization",
-      });
-    }
-
-    const organization = await prisma.organization.findUnique({
-      where: { id: user.organizationId },
-      include: {
-        locations: true,
-      },
-    });
-
-    if (!organization) {
-      return res.status(404).json({
-        error: "Organization not found",
-      });
+      return res.status(404).json({ error: "Organization not found" });
     }
 
     return res.json(organization);
@@ -122,7 +79,7 @@ router.get("/:id", verifyToken, async (req: Request, res: Response) => {
 
     return res.json(organization);
   } catch (error) {
-    console.error("❌ Failed to load organization by id:", error);
+    console.error("❌ Failed to load organization:", error);
     return res.status(500).json({ error: "Failed to load organization" });
   }
 });
